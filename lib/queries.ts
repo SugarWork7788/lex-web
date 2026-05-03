@@ -295,22 +295,26 @@ export type CourtDecisionFull = CourtDecision & {
   full_text: string;
 };
 
+// Parallel HEAD-COUNT queries per known court_code. Three round-trips that
+// fly in parallel (~one round-trip wall-clock) instead of paginating ~3 KB of
+// court_code strings 1000 rows at a time. PostgREST's `select('id', { count:
+// 'exact', head: true })` returns no rows, just the X-Total-Count header —
+// that's why this is dramatically faster than the previous approach as the
+// table grows.
+const KNOWN_COURT_CODES = ["CC", "SC", "SA"] as const;
+
 export async function getCourtCounts(): Promise<Record<string, number>> {
-  const counts: Record<string, number> = {};
-  const PAGE = 1000;
-  for (let start = 0; ; start += PAGE) {
-    const { data, error } = await supabase
-      .from("court_decisions")
-      .select("court_code")
-      .range(start, start + PAGE - 1);
-    if (error) throw new Error(`getCourtCounts: ${error.message}`);
-    const chunk = (data ?? []) as { court_code: string }[];
-    for (const r of chunk) {
-      counts[r.court_code] = (counts[r.court_code] ?? 0) + 1;
-    }
-    if (chunk.length < PAGE) break;
-  }
-  return counts;
+  const results = await Promise.all(
+    KNOWN_COURT_CODES.map(async (code) => {
+      const { count, error } = await supabase
+        .from("court_decisions")
+        .select("id", { count: "exact", head: true })
+        .eq("court_code", code);
+      if (error) throw new Error(`getCourtCounts(${code}): ${error.message}`);
+      return [code, count ?? 0] as const;
+    }),
+  );
+  return Object.fromEntries(results);
 }
 
 export async function listCourtDecisions(opts: {
