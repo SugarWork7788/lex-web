@@ -1,5 +1,6 @@
+import Anthropic from "@anthropic-ai/sdk";
 import { supabase, type Law, type LawArticle } from "./supabase";
-import { getLawBySlug, getLawArticles } from "./queries";
+import { getLawBySlug, getLawArticles, searchArticles } from "./queries";
 
 export const CONSTITUTION_SLUG = "konstitutsiya-na-republika-balgariya";
 
@@ -10,193 +11,248 @@ export type AnalysisLaw = {
   articles: LawArticle[];
 };
 
-export type AnalysisCorpus = {
-  target: AnalysisLaw;
-  constitution: AnalysisLaw | null;
-  referenced: AnalysisLaw[];
-  lawsMap: Record<string, string>;
+export type Concepts = {
+  terms: string[];
+  obligations: string[];
+  rights: string[];
+  entities: string[];
+  key_articles: string[];
 };
 
-export type AnalysisPills = {
-  target: { slug: string; name_bg: string };
-  constitution: { slug: string; name_bg: string } | null;
-  referenced: { slug: string; name_bg: string; category: string }[];
-  lawsMap: Record<string, string>;
+export type Pass2Stats = {
+  searched_terms: number;
+  raw_hits: number;
+  unique_articles: number;
+  laws_touched: number;
 };
 
-export async function getMostReferencedSlugs(
-  fromSlug: string,
-  limit = 10,
-): Promise<string[]> {
-  const PAGE = 1000;
-  const counts = new Map<string, number>();
-  for (let start = 0; ; start += PAGE) {
-    const { data, error } = await supabase
-      .from("cross_references")
-      .select("to_slug")
-      .eq("from_slug", fromSlug)
-      .eq("matched", true)
-      .not("to_slug", "is", null)
-      .range(start, start + PAGE - 1);
-    if (error) throw new Error(`getMostReferencedSlugs: ${error.message}`);
-    const chunk = data ?? [];
-    for (const row of chunk) {
-      const slug = row.to_slug as string | null;
-      if (!slug) continue;
-      counts.set(slug, (counts.get(slug) ?? 0) + 1);
-    }
-    if (chunk.length < PAGE) break;
-  }
-  return [...counts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, limit)
-    .map(([slug]) => slug);
-}
-
-export async function getReferencedLawCount(fromSlug: string): Promise<number> {
-  const slugs = await getMostReferencedSlugs(fromSlug, 1000);
-  return slugs.length;
-}
-
-async function loadLaw(slug: string): Promise<{ law: Law; articles: LawArticle[] } | null> {
+export async function loadFullLaw(slug: string): Promise<AnalysisLaw | null> {
   const law = await getLawBySlug(slug);
   if (!law) return null;
   const articles = await getLawArticles(slug);
   if (articles.length === 0) return null;
-  return { law, articles };
-}
-
-/**
- * Light-weight pre-fetch for the page header pills.
- * Resolves target + constitution + top referenced laws by name only.
- * Does NOT load article bodies — keep the page fast.
- */
-export async function buildPills(targetSlug: string): Promise<AnalysisPills | null> {
-  const target = await getLawBySlug(targetSlug);
-  if (!target) return null;
-
-  const candidateRefSlugs = await getMostReferencedSlugs(targetSlug, 10);
-  const wantConstitution = targetSlug !== CONSTITUTION_SLUG;
-  const allWantedSlugs = new Set(candidateRefSlugs);
-  if (wantConstitution) allWantedSlugs.add(CONSTITUTION_SLUG);
-
-  const slugList = [...allWantedSlugs];
-  const lawRows: (Law | null)[] = await Promise.all(
-    slugList.map((s) => getLawBySlug(s)),
-  );
-
-  const lawsBySlug = new Map<string, Law>();
-  slugList.forEach((s, i) => {
-    const row = lawRows[i];
-    if (row) lawsBySlug.set(s, row);
-  });
-
-  const lawsMap: Record<string, string> = { [target.slug]: target.name_bg };
-  for (const law of lawsBySlug.values()) lawsMap[law.slug] = law.name_bg;
-
-  const constitutionLaw = wantConstitution
-    ? lawsBySlug.get(CONSTITUTION_SLUG) ?? null
-    : null;
-
-  const referenced = candidateRefSlugs
-    .filter((s) => s !== CONSTITUTION_SLUG)
-    .map((s) => lawsBySlug.get(s))
-    .filter((l): l is Law => Boolean(l))
-    .map((l) => ({ slug: l.slug, name_bg: l.name_bg, category: l.category }));
-
   return {
-    target: { slug: target.slug, name_bg: target.name_bg },
-    constitution: constitutionLaw
-      ? { slug: constitutionLaw.slug, name_bg: constitutionLaw.name_bg }
-      : null,
-    referenced,
-    lawsMap,
+    slug: law.slug,
+    name_bg: law.name_bg,
+    category: law.category,
+    articles,
   };
-}
-
-/**
- * Heavy load for the LLM: target + constitution + top referenced laws WITH article bodies.
- * Skips any referenced law that has no articles.
- * Caps article count per referenced law (target + constitution always full).
- */
-export async function loadAnalysisCorpus(
-  targetSlug: string,
-  articleLimitPerReferenced = 200,
-): Promise<AnalysisCorpus | null> {
-  const targetLoaded = await loadLaw(targetSlug);
-  if (!targetLoaded) return null;
-
-  const candidateRefSlugs = await getMostReferencedSlugs(targetSlug, 10);
-  const wantConstitution = targetSlug !== CONSTITUTION_SLUG;
-
-  const refSlugsToLoad = candidateRefSlugs.filter(
-    (s) => s !== CONSTITUTION_SLUG,
-  );
-  const constitutionPromise: Promise<{ law: Law; articles: LawArticle[] } | null> =
-    wantConstitution ? loadLaw(CONSTITUTION_SLUG) : Promise.resolve(null);
-
-  const [refLoaded, constitutionLoaded] = await Promise.all([
-    Promise.all(refSlugsToLoad.map((s) => loadLaw(s))),
-    constitutionPromise,
-  ]);
-
-  const target: AnalysisLaw = {
-    slug: targetLoaded.law.slug,
-    name_bg: targetLoaded.law.name_bg,
-    category: targetLoaded.law.category,
-    articles: targetLoaded.articles,
-  };
-
-  const constitution: AnalysisLaw | null = constitutionLoaded
-    ? {
-        slug: constitutionLoaded.law.slug,
-        name_bg: constitutionLoaded.law.name_bg,
-        category: constitutionLoaded.law.category,
-        articles: constitutionLoaded.articles,
-      }
-    : null;
-
-  const referenced: AnalysisLaw[] = refLoaded
-    .filter((r): r is { law: Law; articles: LawArticle[] } => Boolean(r))
-    .map((r) => ({
-      slug: r.law.slug,
-      name_bg: r.law.name_bg,
-      category: r.law.category,
-      articles: r.articles.slice(0, articleLimitPerReferenced),
-    }));
-
-  const lawsMap: Record<string, string> = { [target.slug]: target.name_bg };
-  if (constitution) lawsMap[constitution.slug] = constitution.name_bg;
-  for (const r of referenced) lawsMap[r.slug] = r.name_bg;
-
-  return { target, constitution, referenced, lawsMap };
 }
 
 export function formatLawForPrompt(law: AnalysisLaw): string {
-  const articleLines = law.articles
+  return law.articles
     .map((a) => `Чл.${a.article_number}: ${a.text_content}`)
     .join("\n\n");
-  return articleLines;
 }
 
-export function estimatePromptChars(corpus: AnalysisCorpus): number {
-  let chars = corpus.target.name_bg.length;
-  chars += corpus.target.articles.reduce(
-    (sum, a) => sum + a.article_number.length + a.text_content.length + 10,
-    0,
+export function estimateTokens(text: string): number {
+  return Math.round(text.length / 2.2);
+}
+
+// =====================================================================
+// PASS 1 — Extract key concepts from the target law
+// =====================================================================
+
+const PASS1_SYSTEM = `Ти си правен анализатор. Извличаш ключови концепции от закон, за да могат да се търсят свързани разпоредби в други закони.
+
+Върни ЕДИН JSON обект, нищо друго. Без markdown, без коментари, без обяснения.
+
+Схема:
+{
+  "terms": ["..."],
+  "obligations": ["..."],
+  "rights": ["..."],
+  "entities": ["..."],
+  "key_articles": ["..."]
+}
+
+- "terms": 8-15 ключови правни термина или фрази (например "трудов договор", "обществена поръчка"). Кратки, конкретни, търсими.
+- "obligations": 4-8 фрази описващи задължения, които законът налага.
+- "rights": 4-8 фрази описващи права, които законът дава.
+- "entities": 4-10 институции, длъжности или субекти, които законът регулира (например "работодател", "Министерски съвет").
+- "key_articles": 5-10 номера на най-важните членове в закона (като strings).
+
+Целта е тези термини да служат за full-text search в база от 1240 български закона. Избирай дискриминативни, не общи думи.`;
+
+export async function extractConcepts(target: AnalysisLaw): Promise<Concepts> {
+  const client = new Anthropic();
+  const userMessage = `ЗАКОН: ${target.name_bg}\n\n${formatLawForPrompt(target)}`;
+
+  const response = await client.messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 2000,
+    system: PASS1_SYSTEM,
+    messages: [{ role: "user", content: userMessage }],
+  });
+
+  const textBlock = response.content.find((b) => b.type === "text");
+  const text = textBlock && textBlock.type === "text" ? textBlock.text : "";
+
+  // Strip any accidental markdown fencing.
+  const cleaned = text
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/```\s*$/i, "")
+    .trim();
+
+  let parsed: Partial<Concepts> = {};
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    // Fallback: derive crude terms from chapter titles + first articles.
+    const titles = new Set<string>();
+    for (const a of target.articles.slice(0, 30)) {
+      if (a.chapter_title) titles.add(a.chapter_title);
+      if (a.section_title) titles.add(a.section_title);
+    }
+    parsed = {
+      terms: [...titles].slice(0, 12),
+      obligations: [],
+      rights: [],
+      entities: [],
+      key_articles: target.articles.slice(0, 5).map((a) => a.article_number),
+    };
+  }
+
+  const norm = (v: unknown): string[] =>
+    Array.isArray(v)
+      ? v
+          .map((x) => String(x).trim())
+          .filter((x) => x.length > 1 && x.length < 200)
+      : [];
+
+  return {
+    terms: norm(parsed.terms),
+    obligations: norm(parsed.obligations),
+    rights: norm(parsed.rights),
+    entities: norm(parsed.entities),
+    key_articles: norm(parsed.key_articles),
+  };
+}
+
+// =====================================================================
+// PASS 2 — Search the entire corpus for related articles
+// =====================================================================
+
+type ArticleRef = { law_slug: string; article_number: string };
+type RankedRef = ArticleRef & { rank: number; law_name_bg: string; category: string };
+
+export async function searchRelevantLaws(
+  concepts: Concepts,
+  excludeSlugs: Set<string>,
+  opts: {
+    perTermLimit?: number;
+    maxArticlesTotal?: number;
+    maxLawsTotal?: number;
+  } = {},
+): Promise<{ laws: AnalysisLaw[]; stats: Pass2Stats }> {
+  const perTermLimit = opts.perTermLimit ?? 8;
+  const maxArticlesTotal = opts.maxArticlesTotal ?? 150;
+  const maxLawsTotal = opts.maxLawsTotal ?? 30;
+
+  // Choose search terms: prioritize terms + entities (most discriminative).
+  const queries = uniqueStrings([
+    ...concepts.terms,
+    ...concepts.entities,
+    ...concepts.obligations.slice(0, 4),
+    ...concepts.rights.slice(0, 4),
+  ]).slice(0, 18);
+
+  // Run FTS in parallel.
+  const allHits = await Promise.all(
+    queries.map((q) =>
+      searchArticles(q, perTermLimit).catch(() => [] as Awaited<ReturnType<typeof searchArticles>>),
+    ),
   );
-  if (corpus.constitution) {
-    chars += corpus.constitution.articles.reduce(
-      (sum, a) => sum + a.article_number.length + a.text_content.length + 10,
-      0,
-    );
+
+  // Dedup by (law_slug, article_number), keep best rank.
+  const seen = new Map<string, RankedRef>();
+  let rawCount = 0;
+  for (const hits of allHits) {
+    for (const h of hits) {
+      rawCount++;
+      if (excludeSlugs.has(h.law_slug)) continue;
+      const key = `${h.law_slug}::${h.article_number}`;
+      const prior = seen.get(key);
+      if (!prior || h.rank > prior.rank) {
+        seen.set(key, {
+          law_slug: h.law_slug,
+          article_number: h.article_number,
+          rank: h.rank,
+          law_name_bg: h.law_name_bg,
+          category: h.category,
+        });
+      }
+    }
   }
-  for (const r of corpus.referenced) {
-    chars += r.name_bg.length + r.category.length + 20;
-    chars += r.articles.reduce(
-      (sum, a) => sum + a.article_number.length + a.text_content.length + 10,
-      0,
-    );
+
+  // Sort all unique articles by rank desc, take top N overall.
+  const ranked = [...seen.values()].sort((a, b) => b.rank - a.rank);
+
+  // Apply caps: maxArticlesTotal globally, maxLawsTotal distinct laws.
+  const lawsAccepted = new Set<string>();
+  const acceptedRefs: RankedRef[] = [];
+  for (const r of ranked) {
+    if (acceptedRefs.length >= maxArticlesTotal) break;
+    if (!lawsAccepted.has(r.law_slug)) {
+      if (lawsAccepted.size >= maxLawsTotal) continue;
+      lawsAccepted.add(r.law_slug);
+    }
+    acceptedRefs.push(r);
   }
-  return chars;
+
+  // Group by law_slug, fetch the matched articles in one batch per law.
+  const byLaw = new Map<string, RankedRef[]>();
+  for (const r of acceptedRefs) {
+    const arr = byLaw.get(r.law_slug) ?? [];
+    arr.push(r);
+    byLaw.set(r.law_slug, arr);
+  }
+
+  const laws: AnalysisLaw[] = await Promise.all(
+    [...byLaw.entries()].map(async ([slug, refs]) => {
+      const articleNumbers = refs.map((r) => r.article_number);
+      const { data, error } = await supabase
+        .from("law_articles")
+        .select(
+          "law_slug, ordinal, chapter_title, section_title, article_number, text_content",
+        )
+        .eq("law_slug", slug)
+        .in("article_number", articleNumbers)
+        .order("ordinal", { ascending: true });
+      if (error) {
+        console.warn(`[analyze] failed to load articles for ${slug}: ${error.message}`);
+        return null;
+      }
+      const articles = (data ?? []) as LawArticle[];
+      if (articles.length === 0) return null;
+      return {
+        slug,
+        name_bg: refs[0].law_name_bg,
+        category: refs[0].category,
+        articles,
+      };
+    }),
+  ).then((arr) => arr.filter((l): l is AnalysisLaw => l !== null));
+
+  return {
+    laws,
+    stats: {
+      searched_terms: queries.length,
+      raw_hits: rawCount,
+      unique_articles: acceptedRefs.length,
+      laws_touched: laws.length,
+    },
+  };
+}
+
+function uniqueStrings(arr: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const s of arr) {
+    const key = s.toLowerCase().trim();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(s);
+  }
+  return out;
 }

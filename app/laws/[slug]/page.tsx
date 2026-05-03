@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getLawBySlug, getLawArticles, getCrossReferencesFrom } from "@/lib/queries";
-import { getReferencedLawCount } from "@/lib/analyze-context";
 
 export const revalidate = 3600;
 
@@ -21,11 +20,10 @@ export async function generateMetadata({ params }: Props) {
 
 export default async function LawReaderPage({ params }: Props) {
   const { slug } = await params;
-  const [law, articles, xrefs, refLawCount] = await Promise.all([
+  const [law, articles, xrefs] = await Promise.all([
     getLawBySlug(slug),
     getLawArticles(slug),
     getCrossReferencesFrom(slug),
-    getReferencedLawCount(slug),
   ]);
 
   if (!law) notFound();
@@ -87,11 +85,8 @@ export default async function LawReaderPage({ params }: Props) {
               конфликти
             </Link>
             <p className="mt-2 text-xs text-black/55 dark:text-white/55">
-              {refLawCount > 0
-                ? `Проверява срещу Конституцията и ${refLawCount} ${
-                    refLawCount === 1 ? "свързан закон" : "свързани закона"
-                  }`
-                : "Проверява срещу Конституцията"}
+              Многостъпков анализ срещу Конституцията и цялата база от 1240
+              български закона
             </p>
           </div>
         )}

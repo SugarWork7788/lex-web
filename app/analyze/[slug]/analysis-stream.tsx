@@ -18,6 +18,7 @@ const ALL_TYPES = [
 type IssueType = (typeof ALL_TYPES)[number];
 
 type Issue = {
+  id: string;
   type: IssueType;
   severity: Severity;
   explanation: string;
@@ -27,10 +28,25 @@ type Issue = {
   conflicting_articles: string[];
   quote_primary: string;
   quote_conflicting: string | null;
-  _error?: boolean;
 };
 
-type Status = "loading" | "streaming" | "done" | "error";
+type IssueUpdate = {
+  status: "verifying" | "verified" | "skipped" | "error";
+  verified?: boolean;
+  refined_explanation?: string;
+  note?: string;
+};
+
+type Phase = { name: string; message: string };
+
+type SearchStats = {
+  searched_terms?: number;
+  raw_hits?: number;
+  unique_articles?: number;
+  laws_touched?: number;
+};
+
+type Status = "idle" | "streaming" | "done" | "error";
 
 const SEVERITY_ORDER: Record<Severity, number> = {
   висок: 0,
@@ -76,24 +92,24 @@ const TYPE_BADGE_TONE: Record<IssueType, string> = {
     "bg-lime-100 text-lime-900 dark:bg-lime-950/60 dark:text-lime-200",
 };
 
-const PROGRESS_MESSAGES = [
-  "Проверявам за конституционни нарушения…",
-  "Търся конфликти между закони…",
-  "Проверявам препратките…",
-  "Идентифицирам правни празнини…",
-];
+const PHASE_LABELS: Record<string, string> = {
+  concepts: "1 / 4 — Извличане на концепции",
+  concepts_done: "1 / 4 — Концепции готови",
+  search: "2 / 4 — Търсене в 1240 закона",
+  search_done: "2 / 4 — Търсене готово",
+  analyze: "3 / 4 — Дълбок анализ",
+  analyze_done: "3 / 4 — Анализ готов",
+  deep_dive: "4 / 4 — Задълбочен преглед на критичните",
+};
 
-function normalizeIssue(raw: unknown): Issue | null {
-  if (!raw || typeof raw !== "object") return null;
-  const o = raw as Record<string, unknown>;
-
-  const sevRaw = typeof o.severity === "string" ? o.severity.toLowerCase().trim() : "";
+function normalizeIssueFromEvent(raw: Record<string, unknown>): Issue | null {
+  const sevRaw = typeof raw.severity === "string" ? raw.severity.toLowerCase().trim() : "";
   const severity: Severity =
     sevRaw === "висок" || sevRaw === "среден" || sevRaw === "нисък"
       ? (sevRaw as Severity)
       : "среден";
 
-  const typeRaw = typeof o.type === "string" ? o.type.toUpperCase().trim() : "";
+  const typeRaw = typeof raw.type === "string" ? raw.type.toUpperCase().trim() : "";
   const type: IssueType =
     (ALL_TYPES as readonly string[]).includes(typeRaw)
       ? (typeRaw as IssueType)
@@ -109,35 +125,36 @@ function normalizeIssue(raw: unknown): Issue | null {
     return [];
   };
 
-  const explanation = typeof o.explanation === "string" ? o.explanation : "";
+  const explanation = typeof raw.explanation === "string" ? raw.explanation : "";
   if (!explanation) return null;
 
-  const primary_law_slug =
-    typeof o.primary_law_slug === "string" ? o.primary_law_slug : "";
-  const conflicting_law_slug_raw = o.conflicting_law_slug;
-  const conflicting_law_slug =
-    typeof conflicting_law_slug_raw === "string" && conflicting_law_slug_raw
-      ? conflicting_law_slug_raw
-      : null;
+  const id = typeof raw.id === "string" ? raw.id : "";
+  if (!id) return null;
 
-  const quote_primary = typeof o.quote_primary === "string" ? o.quote_primary : "";
-  const quote_conflicting_raw = o.quote_conflicting;
+  const primary_law_slug =
+    typeof raw.primary_law_slug === "string" ? raw.primary_law_slug : "";
+  const conflictingRaw = raw.conflicting_law_slug;
+  const conflicting_law_slug =
+    typeof conflictingRaw === "string" && conflictingRaw ? conflictingRaw : null;
+
+  const quote_primary = typeof raw.quote_primary === "string" ? raw.quote_primary : "";
+  const quote_conflicting_raw = raw.quote_conflicting;
   const quote_conflicting =
     typeof quote_conflicting_raw === "string" && quote_conflicting_raw
       ? quote_conflicting_raw
       : null;
 
   return {
+    id,
     type,
     severity,
     explanation,
     primary_law_slug,
-    primary_articles: toStringArray(o.primary_articles),
+    primary_articles: toStringArray(raw.primary_articles),
     conflicting_law_slug,
-    conflicting_articles: toStringArray(o.conflicting_articles),
+    conflicting_articles: toStringArray(raw.conflicting_articles),
     quote_primary,
     quote_conflicting,
-    _error: o._error === true,
   };
 }
 
@@ -149,37 +166,26 @@ function truncateName(name: string, max = 40): string {
 export function AnalysisStream({
   targetSlug,
   targetName,
-  initialLawsMap,
-  analyzedCount,
 }: {
   targetSlug: string;
   targetName: string;
-  initialLawsMap: Record<string, string>;
-  analyzedCount: number;
 }) {
   const [issues, setIssues] = useState<Issue[]>([]);
-  const [status, setStatus] = useState<Status>("loading");
+  const [updates, setUpdates] = useState<Record<string, IssueUpdate>>({});
+  const [status, setStatus] = useState<Status>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [lawsMap, setLawsMap] = useState<Record<string, string>>(initialLawsMap);
+  const [phase, setPhase] = useState<Phase | null>(null);
+  const [lawsMap, setLawsMap] = useState<Record<string, string>>({
+    [targetSlug]: targetName,
+  });
+  const [searchStats, setSearchStats] = useState<SearchStats | null>(null);
   const [filter, setFilter] = useState<IssueType | null>(null);
-  const [progressIdx, setProgressIdx] = useState(0);
   const [retryToken, setRetryToken] = useState(0);
   const startedRef = useRef(false);
   const searchParams = useSearchParams();
   const targetIssueParam = searchParams.get("issue");
 
-  // Cycle progress messages while loading.
-  useEffect(() => {
-    if (status !== "loading" && status !== "streaming") return;
-    if (issues.length > 0) return;
-    const id = setInterval(
-      () => setProgressIdx((i) => (i + 1) % PROGRESS_MESSAGES.length),
-      2500,
-    );
-    return () => clearInterval(id);
-  }, [status, issues.length]);
-
-  // Open the stream and consume.
+  // Open the stream and consume typed events.
   useEffect(() => {
     startedRef.current = false;
   }, [retryToken]);
@@ -190,9 +196,12 @@ export function AnalysisStream({
 
     const controller = new AbortController();
     setIssues([]);
+    setUpdates({});
     setErrorMsg(null);
-    setStatus("loading");
-    setLawsMap(initialLawsMap);
+    setStatus("streaming");
+    setPhase(null);
+    setSearchStats(null);
+    setLawsMap({ [targetSlug]: targetName });
 
     (async () => {
       try {
@@ -206,59 +215,86 @@ export function AnalysisStream({
           setStatus("error");
           return;
         }
-
-        const headerMap = res.headers.get("X-Laws-Map");
-        if (headerMap) {
-          try {
-            const parsed = JSON.parse(decodeURIComponent(headerMap));
-            if (parsed && typeof parsed === "object")
-              setLawsMap((prev) => ({ ...prev, ...parsed }));
-          } catch {
-            // header missing/garbled — keep server-provided map
-          }
-        }
-
         if (!res.body) {
           setErrorMsg("Празен отговор от сървъра");
           setStatus("error");
           return;
         }
 
-        setStatus("streaming");
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
+
+        const handleEvent = (raw: unknown) => {
+          if (!raw || typeof raw !== "object") return;
+          const ev = raw as Record<string, unknown>;
+          const type = ev.event;
+          if (type === "phase") {
+            const name = String(ev.phase ?? "");
+            const message = String(ev.message ?? "");
+            setPhase({ name, message });
+          } else if (type === "laws_map") {
+            const map = ev.laws_map;
+            if (map && typeof map === "object") {
+              setLawsMap((prev) => ({ ...prev, ...(map as Record<string, string>) }));
+            }
+            if (ev.stats && typeof ev.stats === "object") {
+              setSearchStats(ev.stats as SearchStats);
+            }
+          } else if (type === "issue") {
+            const issue = normalizeIssueFromEvent(ev);
+            if (issue) setIssues((prev) => [...prev, issue]);
+          } else if (type === "issue_update") {
+            const id = typeof ev.id === "string" ? ev.id : "";
+            if (!id) return;
+            setUpdates((prev) => ({
+              ...prev,
+              [id]: {
+                ...(prev[id] ?? { status: "verifying" }),
+                status: (ev.status as IssueUpdate["status"]) ?? prev[id]?.status ?? "verifying",
+                verified:
+                  typeof ev.verified === "boolean" ? ev.verified : prev[id]?.verified,
+                refined_explanation:
+                  typeof ev.refined_explanation === "string"
+                    ? ev.refined_explanation
+                    : prev[id]?.refined_explanation,
+                note: typeof ev.note === "string" ? ev.note : prev[id]?.note,
+              },
+            }));
+          } else if (type === "done") {
+            setStatus("done");
+          } else if (type === "fatal") {
+            setErrorMsg(String(ev.message ?? "Неизвестна грешка"));
+            setStatus("error");
+          }
+        };
+
+        const flushLine = (line: string) => {
+          const trimmed = line.trim();
+          if (!trimmed) return;
+          try {
+            const parsed = JSON.parse(trimmed);
+            handleEvent(parsed);
+          } catch {
+            // incomplete line — wait
+          }
+        };
 
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
-
           let nl: number;
           while ((nl = buffer.indexOf("\n")) !== -1) {
-            const line = buffer.slice(0, nl).trim();
+            const line = buffer.slice(0, nl);
             buffer = buffer.slice(nl + 1);
-            if (!line) continue;
-            try {
-              const parsed = normalizeIssue(JSON.parse(line));
-              if (parsed) setIssues((prev) => [...prev, parsed]);
-            } catch {
-              // Incomplete line — wait for more bytes.
-            }
+            flushLine(line);
           }
         }
+        if (buffer.trim()) flushLine(buffer);
 
-        const tail = buffer.trim();
-        if (tail) {
-          try {
-            const parsed = normalizeIssue(JSON.parse(tail));
-            if (parsed) setIssues((prev) => [...prev, parsed]);
-          } catch {
-            // ignore
-          }
-        }
-
-        setStatus("done");
+        // If the stream closed without explicit done/fatal, mark done.
+        setStatus((s) => (s === "streaming" ? "done" : s));
       } catch (err) {
         if ((err as Error).name === "AbortError") return;
         setErrorMsg(err instanceof Error ? err.message : String(err));
@@ -267,15 +303,14 @@ export function AnalysisStream({
     })();
 
     return () => controller.abort();
-  }, [targetSlug, initialLawsMap, retryToken]);
+  }, [targetSlug, targetName, retryToken]);
 
-  // Group + sort + filter.
+  // Sort + filter for display.
   const grouped = useMemo(() => {
     const filtered = filter ? issues.filter((i) => i.type === filter) : issues;
-    const sorted = [...filtered].sort(
+    return [...filtered].sort(
       (a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity],
     );
-    return sorted;
   }, [issues, filter]);
 
   const counts = useMemo(() => {
@@ -283,14 +318,21 @@ export function AnalysisStream({
     let high = 0,
       mid = 0,
       low = 0;
+    let verified = 0,
+      refuted = 0;
     for (const i of issues) {
       byType[i.type] = (byType[i.type] ?? 0) + 1;
       if (i.severity === "висок") high++;
       else if (i.severity === "среден") mid++;
       else low++;
+      const u = updates[i.id];
+      if (u?.status === "verified") {
+        if (u.verified) verified++;
+        else refuted++;
+      }
     }
-    return { high, mid, low, byType };
-  }, [issues]);
+    return { high, mid, low, byType, verified, refuted };
+  }, [issues, updates]);
 
   // Scroll to ?issue=N once results have loaded.
   useEffect(() => {
@@ -309,13 +351,28 @@ export function AnalysisStream({
     return () => clearTimeout(t);
   }, [targetIssueParam, grouped.length]);
 
+  const totalAnalyzedLaws = Object.keys(lawsMap).length;
+  const showPhaseStrip = status === "streaming" && phase !== null;
+
   return (
-    <section className="mt-8 print-area">
+    <section className="mt-6 print-area">
+      {showPhaseStrip && (
+        <PhaseStrip phase={phase!} stats={searchStats} status={status} />
+      )}
+
+      {totalAnalyzedLaws > 1 && (
+        <PillsBar
+          lawsMap={lawsMap}
+          targetSlug={targetSlug}
+          stats={searchStats}
+        />
+      )}
+
       {issues.length > 0 && (
         <SummaryCard
           counts={counts}
           targetName={targetName}
-          analyzedCount={analyzedCount}
+          analyzedCount={totalAnalyzedLaws}
           status={status}
         />
       )}
@@ -345,39 +402,23 @@ export function AnalysisStream({
         </div>
       )}
 
-      {(status === "loading" ||
-        (status === "streaming" && issues.length === 0)) && (
-        <LoadingSkeleton
-          message={
-            status === "loading"
-              ? `Анализирам ${analyzedCount} закона…`
-              : PROGRESS_MESSAGES[progressIdx]
-          }
-        />
+      {status === "streaming" && issues.length === 0 && (
+        <LoadingSkeleton message={phase?.message ?? "Подготовка…"} />
       )}
 
       {grouped.length > 0 && (
         <ul className="mt-6 space-y-4">
-          {grouped.map((issue, displayIdx) => {
-            const issueIdx = issues.indexOf(issue);
-            return (
-              <IssueCard
-                key={issueIdx}
-                issue={issue}
-                index={issueIdx}
-                displayIndex={displayIdx}
-                targetSlug={targetSlug}
-                lawsMap={lawsMap}
-              />
-            );
-          })}
+          {grouped.map((issue, displayIdx) => (
+            <IssueCard
+              key={issue.id}
+              issue={issue}
+              displayIndex={displayIdx}
+              targetSlug={targetSlug}
+              lawsMap={lawsMap}
+              update={updates[issue.id]}
+            />
+          ))}
         </ul>
-      )}
-
-      {status === "streaming" && issues.length > 0 && (
-        <p className="mt-6 text-xs text-black/55 dark:text-white/55 animate-pulse print:hidden">
-          {PROGRESS_MESSAGES[progressIdx]}
-        </p>
       )}
 
       {status === "done" && issues.length === 0 && (
@@ -386,8 +427,8 @@ export function AnalysisStream({
             Не са открити съществени правни проблеми
           </h3>
           <p className="mt-1 text-sm">
-            Анализът на {analyzedCount} закона не откри значими противоречия,
-            конституционни нарушения или правни празнини.
+            Анализът на {totalAnalyzedLaws} закона не откри значими
+            противоречия, конституционни нарушения или правни празнини.
           </p>
         </div>
       )}
@@ -409,20 +450,143 @@ export function AnalysisStream({
   );
 }
 
+function PhaseStrip({
+  phase,
+  stats,
+  status,
+}: {
+  phase: Phase;
+  stats: SearchStats | null;
+  status: Status;
+}) {
+  const label = PHASE_LABELS[phase.name] ?? phase.message;
+  const isActive = !phase.name.endsWith("_done") && status === "streaming";
+  return (
+    <div className="rounded-lg border border-amber-300 bg-amber-50/60 px-4 py-2.5 text-sm dark:border-amber-700/60 dark:bg-amber-950/30 print:hidden">
+      <div className="flex items-center gap-3">
+        <span
+          className={`inline-block h-2 w-2 rounded-full ${
+            isActive
+              ? "bg-amber-500 animate-pulse"
+              : "bg-emerald-500"
+          }`}
+          aria-hidden
+        />
+        <strong className="font-semibold text-amber-900 dark:text-amber-200">
+          {label}
+        </strong>
+        <span className="text-amber-800/80 dark:text-amber-200/80">
+          {phase.message}
+        </span>
+        {stats && phase.name === "search_done" && (
+          <span className="ml-auto text-xs text-amber-800/70 dark:text-amber-200/70">
+            {stats.searched_terms} термина · {stats.unique_articles} статии ·{" "}
+            {stats.laws_touched} закона
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PillsBar({
+  lawsMap,
+  targetSlug,
+  stats,
+}: {
+  lawsMap: Record<string, string>;
+  targetSlug: string;
+  stats: SearchStats | null;
+}) {
+  const constitutionSlug = "konstitutsiya-na-republika-balgariya";
+  const slugs = Object.keys(lawsMap);
+  const target = lawsMap[targetSlug];
+  const constitution = lawsMap[constitutionSlug];
+  const others = slugs.filter(
+    (s) => s !== targetSlug && s !== constitutionSlug,
+  );
+
+  return (
+    <section className="mt-4 print:hidden">
+      <h2 className="text-xs uppercase tracking-wider font-medium text-black/55 dark:text-white/55">
+        Анализирани закони ({slugs.length})
+        {stats && ` — намерени чрез full-text search в 1240 закона`}
+      </h2>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {target && (
+          <PillLink
+            slug={targetSlug}
+            label={target}
+            icon="★"
+            tone="target"
+          />
+        )}
+        {constitution && constitutionSlug !== targetSlug && (
+          <PillLink
+            slug={constitutionSlug}
+            label={constitution}
+            icon="⚖"
+            tone="constitution"
+          />
+        )}
+        {others.map((s) => (
+          <PillLink key={s} slug={s} label={lawsMap[s]} tone="ref" />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function PillLink({
+  slug,
+  label,
+  icon,
+  tone,
+}: {
+  slug: string;
+  label: string;
+  icon?: string;
+  tone: "target" | "constitution" | "ref";
+}) {
+  const truncated = label.length > 48 ? label.slice(0, 46) + "…" : label;
+  const toneClass =
+    tone === "target"
+      ? "border-amber-400 bg-amber-50 text-amber-900 dark:border-amber-600/60 dark:bg-amber-950/40 dark:text-amber-200"
+      : tone === "constitution"
+        ? "border-indigo-300 bg-indigo-50 text-indigo-900 dark:border-indigo-700/60 dark:bg-indigo-950/40 dark:text-indigo-200"
+        : "border-black/10 bg-white text-black/75 hover:bg-black/[0.03] dark:border-white/15 dark:bg-white/[0.04] dark:text-white/75 dark:hover:bg-white/[0.06]";
+  return (
+    <a
+      href={`/laws/${slug}`}
+      title={label}
+      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs ${toneClass}`}
+    >
+      {icon && <span aria-hidden>{icon}</span>}
+      <span>{truncated}</span>
+    </a>
+  );
+}
+
 function SummaryCard({
   counts,
   targetName,
   analyzedCount,
   status,
 }: {
-  counts: { high: number; mid: number; low: number };
+  counts: {
+    high: number;
+    mid: number;
+    low: number;
+    verified: number;
+    refuted: number;
+  };
   targetName: string;
   analyzedCount: number;
   status: Status;
 }) {
   const total = counts.high + counts.mid + counts.low;
   return (
-    <div className="rounded-lg border border-black/[0.08] bg-white px-5 py-4 dark:border-white/[0.1] dark:bg-white/[0.03] print:border-black">
+    <div className="mt-5 rounded-lg border border-black/[0.08] bg-white px-5 py-4 dark:border-white/[0.1] dark:bg-white/[0.03] print:border-black">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="font-serif text-lg font-semibold">
           Открити {total} {total === 1 ? "проблем" : "проблема"}
@@ -432,12 +596,18 @@ function SummaryCard({
         </span>
       </div>
       <p className="mt-1 text-sm text-black/65 dark:text-white/65">
-        В {targetName} и {analyzedCount - 1} свързани акта.
+        В {targetName} спрямо {analyzedCount - 1} други нормативни акта.
       </p>
       <div className="mt-3 flex flex-wrap gap-3 text-sm">
         <SummaryStat n={counts.high} label="критични" tone="red" />
         <SummaryStat n={counts.mid} label="средни" tone="orange" />
         <SummaryStat n={counts.low} label="ниски" tone="yellow" />
+        {(counts.verified > 0 || counts.refuted > 0) && (
+          <span className="ml-auto text-xs text-black/55 dark:text-white/55">
+            Задълбочен преглед: {counts.verified} потвърдени,{" "}
+            {counts.refuted} опровергани
+          </span>
+        )}
       </div>
     </div>
   );
@@ -511,16 +681,16 @@ function LoadingSkeleton({ message }: { message: string }) {
 
 function IssueCard({
   issue,
-  index,
   displayIndex,
   targetSlug,
   lawsMap,
+  update,
 }: {
   issue: Issue;
-  index: number;
   displayIndex: number;
   targetSlug: string;
   lawsMap: Record<string, string>;
+  update?: IssueUpdate;
 }) {
   const [showQuotes, setShowQuotes] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -544,10 +714,18 @@ function IssueCard({
     }
   };
 
+  const isVerifying = update?.status === "verifying";
+  const isVerified = update?.status === "verified";
+  const verifiedTrue = isVerified && update.verified === true;
+  const verifiedFalse = isVerified && update.verified === false;
+  const showRefined = isVerified && Boolean(update.refined_explanation);
+
   return (
     <li
       id={`issue-${displayIndex}`}
-      className={`rounded-lg border px-5 py-4 transition-shadow ${SEVERITY_CARD[issue.severity]} print:break-inside-avoid`}
+      className={`rounded-lg border px-5 py-4 transition-shadow ${SEVERITY_CARD[issue.severity]} print:break-inside-avoid ${
+        verifiedFalse ? "opacity-80" : ""
+      }`}
     >
       <div className="flex flex-wrap items-center gap-2">
         <span
@@ -560,14 +738,47 @@ function IssueCard({
         >
           {issue.type}
         </span>
+        {isVerifying && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-amber-200 px-2 py-0.5 text-[11px] font-medium text-amber-900 dark:bg-amber-700/60 dark:text-amber-100 print:hidden">
+            <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-amber-700 dark:bg-amber-200" />
+            Задълбочен преглед…
+          </span>
+        )}
+        {verifiedTrue && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-200 px-2 py-0.5 text-[11px] font-medium text-emerald-900 dark:bg-emerald-700/60 dark:text-emerald-100">
+            ✓ Потвърден от задълбочен анализ
+          </span>
+        )}
+        {verifiedFalse && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-stone-200 px-2 py-0.5 text-[11px] font-medium text-stone-800 dark:bg-stone-700/70 dark:text-stone-100">
+            ⚠ Опровергано при пълен прочит
+          </span>
+        )}
+        {update?.status === "skipped" && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-stone-200 px-2 py-0.5 text-[11px] font-medium text-stone-800 dark:bg-stone-700/70 dark:text-stone-100 print:hidden">
+            Прегледът е пропуснат
+          </span>
+        )}
+        {update?.status === "error" && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-red-200 px-2 py-0.5 text-[11px] font-medium text-red-800 dark:bg-red-800/60 dark:text-red-100 print:hidden">
+            Прегледът не успя
+          </span>
+        )}
         <span className="ml-auto text-[11px] text-black/45 dark:text-white/45 print:hidden">
           #{displayIndex + 1}
         </span>
       </div>
 
       <p className="mt-3 text-[0.95rem] leading-relaxed text-black/85 dark:text-white/85">
-        {issue.explanation}
+        {showRefined ? update!.refined_explanation : issue.explanation}
       </p>
+
+      {showRefined && (
+        <p className="mt-1 text-[11px] uppercase tracking-wide text-black/45 dark:text-white/45 print:hidden">
+          Обяснението е допълнено след задълбочен преглед на пълните текстове на
+          двата закона.
+        </p>
+      )}
 
       {issue.primary_articles.length > 0 && (
         <ArticleRow
@@ -629,7 +840,6 @@ function IssueCard({
         </div>
       )}
 
-      {/* Print-only quotes always visible */}
       {hasQuotes && (
         <div className="mt-3 hidden space-y-2 border-t border-black pt-3 text-sm print:block">
           {issue.quote_primary && (

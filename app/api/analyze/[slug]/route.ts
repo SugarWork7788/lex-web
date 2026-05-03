@@ -1,17 +1,21 @@
 import Anthropic from "@anthropic-ai/sdk";
 import {
-  loadAnalysisCorpus,
+  CONSTITUTION_SLUG,
+  loadFullLaw,
+  extractConcepts,
+  searchRelevantLaws,
   formatLawForPrompt,
-  estimatePromptChars,
-  type AnalysisCorpus,
+  estimateTokens,
+  type AnalysisLaw,
 } from "@/lib/analyze-context";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-const SYSTEM_PROMPT = `Ти си правен анализатор на българското законодателство.
-Предоставени са ти основен закон и всички закони, кодекси, наредби и правилници,
-към които той препраща, включително Конституцията на Република България.
+const PASS3_SYSTEM = `Ти си правен анализатор на българското законодателство.
+Получаваш основен закон, Конституцията на Република България, и подбран набор от
+свързани разпоредби от цялата база на 1240 български закона, открити чрез full-text
+search по ключовите концепции на основния закон.
 
 Задачата ти е да намериш реални правни проблеми.
 
@@ -33,34 +37,55 @@ const SYSTEM_PROMPT = `Ти си правен анализатор на бълг
 "ВЪТРЕШНО ПРОТИВОРЕЧИЕ", "МЪРТВА ПРЕПРАТКА", "ПРАВНА ПРАЗНИНА", "НЕЯСНА ФОРМУЛИРОВКА".
 
 Полето "severity" ТРЯБВА да е точно една от: "нисък", "среден", "висок".
-- висок = нарушава основни права или Конституцията
-- среден = реален конфликт между норми
-- нисък = неяснота или пропуск без пряко увреждане
 
 Формат на всеки ред (един JSON обект, без нов ред вътре):
-{"type":"ТИП","severity":"нисък|среден|висок","explanation":"Обяснение на ясен български без правен жаргон. Какво е проблемът и защо има значение за гражданин. 2-4 изречения.","primary_law_slug":"slug","primary_articles":["5","12а"],"conflicting_law_slug":"slug или null","conflicting_articles":["3","7"],"quote_primary":"Точен цитат от засегнатия член","quote_conflicting":"Точен цитат от конфликтиращия член или null"}
+{"type":"ТИП","severity":"нисък|среден|висок","explanation":"Обяснение на ясен български без правен жаргон. 2-4 изречения.","primary_law_slug":"slug","primary_articles":["5","12а"],"conflicting_law_slug":"slug или null","conflicting_articles":["3","7"],"quote_primary":"Точен цитат","quote_conflicting":"Точен цитат или null"}
 
 Изисквания:
 - primary_law_slug ВИНАГИ е slugът на основния анализиран закон.
 - conflicting_law_slug е slug на другия закон или null ако проблемът е вътрешен.
-- primary_articles и conflicting_articles са масиви от номера на членове като strings (например ["5","12а"]).
-- quote_primary и quote_conflicting са кратки точни цитати от съответните членове.
-- Намери ВСИЧКИ значими проблеми, не само очевидните. Без измислени проблеми.
-- Ако наистина няма проблем от даден тип, просто не го включвай.`;
+- primary_articles и conflicting_articles са масиви от номера на членове като strings.
+- quote_primary и quote_conflicting са кратки точни цитати.
+- Можеш да използваш само разпоредбите, които са ти подадени. Не измисляй членове.`;
 
-function buildUserMessage(corpus: AnalysisCorpus): string {
+const PASS4_SYSTEM = `Ти си правен анализатор. Получаваш конкретен предполагаем правен проблем
+и пълните текстове на двата засегнати закона.
+
+Задачата ти: при по-внимателен прочит, потвърди или опровергай проблема и дай по-точно обяснение.
+
+Върни ЕДИН JSON ред, нищо друго:
+{"verified":true|false,"refined_explanation":"Подробно обяснение базирано на пълния контекст на двата закона. 3-5 изречения. Без markdown."}
+
+- "verified": true ако проблемът е реален при пълен контекст; false ако всъщност няма противоречие.
+- "refined_explanation": Конкретно, точно обяснение. Цитирай номера на членове, ако е уместно.`;
+
+type StreamEvent =
+  | { event: "phase"; phase: string; message: string; data?: unknown }
+  | { event: "laws_map"; laws_map: Record<string, string>; stats: unknown }
+  | { event: "issue"; id: string; [k: string]: unknown }
+  | { event: "issue_update"; id: string; [k: string]: unknown }
+  | { event: "done"; total: number }
+  | { event: "fatal"; message: string };
+
+function buildPass3UserMessage(
+  target: AnalysisLaw,
+  constitution: AnalysisLaw | null,
+  related: AnalysisLaw[],
+): string {
   const parts: string[] = [];
   parts.push(
-    `ОСНОВЕН ЗАКОН: ${corpus.target.name_bg} (slug: ${corpus.target.slug})\n${formatLawForPrompt(corpus.target)}`,
+    `ОСНОВЕН ЗАКОН: ${target.name_bg} (slug: ${target.slug})\n${formatLawForPrompt(target)}`,
   );
-  if (corpus.constitution) {
+  if (constitution) {
     parts.push(
-      `\n\nКОНСТИТУЦИЯ НА РЕПУБЛИКА БЪЛГАРИЯ (slug: ${corpus.constitution.slug}):\n${formatLawForPrompt(corpus.constitution)}`,
+      `\n\nКОНСТИТУЦИЯ НА РЕПУБЛИКА БЪЛГАРИЯ (slug: ${constitution.slug}):\n${formatLawForPrompt(constitution)}`,
     );
   }
-  if (corpus.referenced.length > 0) {
-    parts.push(`\n\nРЕФЕРЕНТНИ ЗАКОНИ:`);
-    for (const r of corpus.referenced) {
+  if (related.length > 0) {
+    parts.push(
+      `\n\nСВЪРЗАНИ РАЗПОРЕДБИ ОТ ДРУГИ ЗАКОНИ (избрани чрез full-text search):`,
+    );
+    for (const r of related) {
       parts.push(
         `\n--- ${r.name_bg} (slug: ${r.slug}, категория: ${r.category}) ---\n${formatLawForPrompt(r)}`,
       );
@@ -69,68 +94,283 @@ function buildUserMessage(corpus: AnalysisCorpus): string {
   return parts.join("");
 }
 
+function buildPass4UserMessage(
+  issue: Record<string, unknown>,
+  target: AnalysisLaw,
+  conflicting: AnalysisLaw,
+): string {
+  const arr = (v: unknown) =>
+    Array.isArray(v) ? v.map(String).join(", ") : String(v ?? "");
+  return [
+    `ПРЕДПОЛАГАЕМ ПРОБЛЕМ`,
+    `Тип: ${issue.type ?? ""}`,
+    `Сериозност: ${issue.severity ?? ""}`,
+    `Обяснение: ${issue.explanation ?? ""}`,
+    `Засегнати членове в ${target.name_bg}: ${arr(issue.primary_articles)}`,
+    `Конфликт с членове в ${conflicting.name_bg}: ${arr(issue.conflicting_articles)}`,
+    `Цитат от основния закон: ${issue.quote_primary ?? ""}`,
+    `Цитат от конфликтиращия закон: ${issue.quote_conflicting ?? ""}`,
+    ``,
+    `ПЪЛЕН ТЕКСТ НА ОСНОВНИЯ ЗАКОН (${target.name_bg}):`,
+    formatLawForPrompt(target),
+    ``,
+    `ПЪЛЕН ТЕКСТ НА КОНФЛИКТИРАЩИЯ ЗАКОН (${conflicting.name_bg}):`,
+    formatLawForPrompt(conflicting),
+  ].join("\n");
+}
+
 export async function POST(
   _req: Request,
   ctx: { params: Promise<{ slug: string }> },
 ) {
   const { slug } = await ctx.params;
-
-  const corpus = await loadAnalysisCorpus(slug);
-  if (!corpus) {
-    return new Response("Не е намерен закон или няма заредено съдържание", {
-      status: 404,
-    });
-  }
-
-  const userMessage = buildUserMessage(corpus);
-
-  const totalChars = estimatePromptChars(corpus);
-  const tokenEstimate = Math.round(totalChars / 2.2);
-  console.log(
-    `[analyze:${slug}] target=${corpus.target.articles.length}art constitution=${corpus.constitution?.articles.length ?? 0}art referenced=${corpus.referenced.length}laws chars=${totalChars} ~tokens=${tokenEstimate}`,
-  );
-
-  const lawsMapHeader = encodeURIComponent(JSON.stringify(corpus.lawsMap));
-
-  const client = new Anthropic();
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
     async start(controller) {
+      const emit = (e: StreamEvent) => {
+        controller.enqueue(encoder.encode(JSON.stringify(e) + "\n"));
+      };
+
+      const failFatal = (msg: string) => {
+        emit({ event: "fatal", message: msg });
+        controller.close();
+      };
+
       try {
+        // ---- PRELUDE: load target ----
+        const target = await loadFullLaw(slug);
+        if (!target) {
+          failFatal("Не е намерен закон или няма заредено съдържание");
+          return;
+        }
+
+        // ---- PASS 1: extract concepts ----
+        emit({
+          event: "phase",
+          phase: "concepts",
+          message: "Извличам ключови концепции от закона…",
+        });
+        const concepts = await extractConcepts(target);
+        emit({
+          event: "phase",
+          phase: "concepts_done",
+          message: `Намерих ${concepts.terms.length} ключови термина`,
+          data: {
+            terms: concepts.terms.length,
+            entities: concepts.entities.length,
+          },
+        });
+
+        // ---- PASS 2: FTS across the entire corpus ----
+        emit({
+          event: "phase",
+          phase: "search",
+          message: "Търся в 1240 закона по ключовите концепции…",
+        });
+
+        const exclude = new Set<string>([target.slug, CONSTITUTION_SLUG]);
+        const { laws: relatedLaws, stats } = await searchRelevantLaws(
+          concepts,
+          exclude,
+        );
+
+        // Always include constitution (full).
+        const constitution =
+          target.slug === CONSTITUTION_SLUG
+            ? null
+            : await loadFullLaw(CONSTITUTION_SLUG);
+
+        emit({
+          event: "phase",
+          phase: "search_done",
+          message: `Намерих ${stats.unique_articles} релевантни статии в ${stats.laws_touched} закона`,
+          data: stats,
+        });
+
+        // Build laws_map and emit so the UI can render pills.
+        const lawsMap: Record<string, string> = {
+          [target.slug]: target.name_bg,
+        };
+        if (constitution) lawsMap[constitution.slug] = constitution.name_bg;
+        for (const l of relatedLaws) lawsMap[l.slug] = l.name_bg;
+        emit({ event: "laws_map", laws_map: lawsMap, stats });
+
+        // ---- PASS 3: deep conflict analysis (streaming) ----
+        const pass3UserMessage = buildPass3UserMessage(
+          target,
+          constitution,
+          relatedLaws,
+        );
+        const pass3Tokens = estimateTokens(pass3UserMessage);
+        console.log(
+          `[analyze:${slug}] pass3: target=${target.articles.length}art constitution=${constitution?.articles.length ?? 0}art related=${relatedLaws.length}laws/${stats.unique_articles}art ~tokens=${pass3Tokens}`,
+        );
+
+        emit({
+          event: "phase",
+          phase: "analyze",
+          message: "Дълбок анализ за конфликти и противоречия…",
+        });
+
+        const client = new Anthropic();
+        const issues: Array<Record<string, unknown> & { id: string }> = [];
+
         const claudeStream = client.messages.stream({
           model: "claude-sonnet-4-6",
           max_tokens: 16000,
-          system: SYSTEM_PROMPT,
-          messages: [{ role: "user", content: userMessage }],
+          system: PASS3_SYSTEM,
+          messages: [{ role: "user", content: pass3UserMessage }],
         });
 
+        let buffer = "";
+        let counter = 0;
+
         claudeStream.on("text", (delta) => {
-          controller.enqueue(encoder.encode(delta));
+          buffer += delta;
+          let nl: number;
+          while ((nl = buffer.indexOf("\n")) !== -1) {
+            const line = buffer.slice(0, nl).trim();
+            buffer = buffer.slice(nl + 1);
+            if (!line) continue;
+            try {
+              const parsed = JSON.parse(line);
+              if (typeof parsed !== "object" || parsed === null) continue;
+              const id = `i${counter++}`;
+              const issue = { ...parsed, id };
+              issues.push(issue);
+              emit({ event: "issue", ...issue });
+            } catch {
+              // incomplete — wait
+            }
+          }
         });
 
         await claudeStream.finalMessage();
+
+        // Tail flush.
+        const tail = buffer.trim();
+        if (tail) {
+          try {
+            const parsed = JSON.parse(tail);
+            if (typeof parsed === "object" && parsed !== null) {
+              const id = `i${counter++}`;
+              const issue = { ...parsed, id };
+              issues.push(issue);
+              emit({ event: "issue", ...issue });
+            }
+          } catch {
+            // ignore
+          }
+        }
+
+        emit({
+          event: "phase",
+          phase: "analyze_done",
+          message: `Открити ${issues.length} ${issues.length === 1 ? "проблем" : "проблема"}`,
+          data: { total: issues.length },
+        });
+
+        // ---- PASS 4: deep-dive on top висок issues ----
+        const highIssues = issues
+          .filter(
+            (i) =>
+              i.severity === "висок" &&
+              typeof i.conflicting_law_slug === "string" &&
+              i.conflicting_law_slug,
+          )
+          .slice(0, 3);
+
+        if (highIssues.length > 0) {
+          emit({
+            event: "phase",
+            phase: "deep_dive",
+            message: `Задълбочен анализ за ${highIssues.length} критични ${highIssues.length === 1 ? "проблема" : "проблема"}…`,
+            data: { count: highIssues.length },
+          });
+
+          await Promise.allSettled(
+            highIssues.map(async (issue) => {
+              const conflictingSlug = issue.conflicting_law_slug as string;
+              try {
+                emit({
+                  event: "issue_update",
+                  id: issue.id,
+                  status: "verifying",
+                });
+                const conflicting = await loadFullLaw(conflictingSlug);
+                if (!conflicting) {
+                  emit({
+                    event: "issue_update",
+                    id: issue.id,
+                    status: "skipped",
+                    note: "Конфликтиращият закон не може да бъде зареден",
+                  });
+                  return;
+                }
+                const userMessage = buildPass4UserMessage(
+                  issue,
+                  target,
+                  conflicting,
+                );
+                const response = await client.messages.create({
+                  model: "claude-sonnet-4-6",
+                  max_tokens: 1500,
+                  system: PASS4_SYSTEM,
+                  messages: [{ role: "user", content: userMessage }],
+                });
+                const block = response.content.find((b) => b.type === "text");
+                const text =
+                  block && block.type === "text" ? block.text.trim() : "";
+                const cleaned = text
+                  .replace(/^```(?:json)?\s*/i, "")
+                  .replace(/```\s*$/i, "")
+                  .trim();
+                let result: { verified?: boolean; refined_explanation?: string } = {};
+                try {
+                  result = JSON.parse(cleaned);
+                } catch {
+                  emit({
+                    event: "issue_update",
+                    id: issue.id,
+                    status: "error",
+                    note: "Неуспешно парсване на дълбоко проучване",
+                  });
+                  return;
+                }
+                emit({
+                  event: "issue_update",
+                  id: issue.id,
+                  status: "verified",
+                  verified: Boolean(result.verified),
+                  refined_explanation: result.refined_explanation ?? "",
+                });
+              } catch (err) {
+                const msg = err instanceof Error ? err.message : String(err);
+                console.error(
+                  `[analyze:${slug}] pass4 error for ${issue.id}: ${msg}`,
+                );
+                emit({
+                  event: "issue_update",
+                  id: issue.id,
+                  status: "error",
+                  note: msg,
+                });
+              }
+            }),
+          );
+        }
+
+        emit({ event: "done", total: issues.length });
         controller.close();
       } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        console.error(`[analyze:${slug}] error:`, message);
-        controller.enqueue(
-          encoder.encode(
-            `\n${JSON.stringify({
-              type: "ВЪТРЕШНО ПРОТИВОРЕЧИЕ",
-              severity: "висок",
-              explanation: `Грешка при анализ: ${message}`,
-              primary_law_slug: slug,
-              primary_articles: [],
-              conflicting_law_slug: null,
-              conflicting_articles: [],
-              quote_primary: "",
-              quote_conflicting: null,
-              _error: true,
-            })}\n`,
-          ),
-        );
-        controller.close();
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[analyze:${slug}] fatal: ${msg}`);
+        try {
+          failFatal(msg);
+        } catch {
+          // controller already closed
+        }
       }
     },
   });
@@ -140,8 +380,6 @@ export async function POST(
       "Content-Type": "text/plain; charset=utf-8",
       "Cache-Control": "no-store",
       "X-Accel-Buffering": "no",
-      "X-Laws-Map": lawsMapHeader,
-      "Access-Control-Expose-Headers": "X-Laws-Map",
     },
   });
 }
