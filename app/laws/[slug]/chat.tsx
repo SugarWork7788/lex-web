@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 type Turn = { q: string; a: string };
 
 const ARTICLE_RE = /Чл\.?\s*(\d+[а-я]?)/g;
 
 const EXAMPLE_QUESTIONS = [
-  "Какви са основните права по този закон?",
-  "Кой е задължен по този закон?",
-  "Какви са санкциите?",
+  "Какви са правата ми при уволнение?",
+  "Какви санкции предвижда законът за неплащане на наем?",
+  "Как се урежда наследството при липса на завещание?",
 ];
 
 function extractCitedArticles(text: string): string[] {
@@ -25,6 +25,114 @@ function extractCitedArticles(text: string): string[] {
     }
   }
   return out;
+}
+
+// Tolerant inline-markdown renderer: splits on **bold** and renders the rest
+// as plain text. Unmatched ** falls back to literal characters — important
+// for rendering partial streams.
+function renderInline(text: string): ReactNode {
+  if (!text) return null;
+  const parts: ReactNode[] = [];
+  const re = /\*\*([^*]+)\*\*/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  let key = 0;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) parts.push(text.slice(last, m.index));
+    parts.push(<strong key={key++}>{m[1]}</strong>);
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  if (parts.length === 0) return text;
+  return <>{parts}</>;
+}
+
+// Tolerant block-level markdown renderer for streamed Claude output.
+// Supports: ## headings, - / * bullet lists, **bold**, paragraph breaks on
+// blank lines. Unknown / partial markup degrades to plain text.
+function renderMarkdown(text: string): ReactNode {
+  if (!text) return null;
+  const lines = text.split("\n");
+  const blocks: ReactNode[] = [];
+  let listBuf: ReactNode[] = [];
+  let paraBuf: string[] = [];
+  let blockKey = 0;
+
+  const flushList = () => {
+    if (listBuf.length === 0) return;
+    blocks.push(
+      <ul
+        key={`ul-${blockKey++}`}
+        className="my-2 list-disc space-y-1 pl-5 text-[0.95rem] leading-relaxed"
+      >
+        {listBuf}
+      </ul>,
+    );
+    listBuf = [];
+  };
+  const flushPara = () => {
+    if (paraBuf.length === 0) return;
+    const joined = paraBuf.join(" ").trim();
+    if (joined) {
+      blocks.push(
+        <p
+          key={`p-${blockKey++}`}
+          className="my-2 text-[0.95rem] leading-relaxed"
+        >
+          {renderInline(joined)}
+        </p>,
+      );
+    }
+    paraBuf = [];
+  };
+
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) {
+      flushPara();
+      flushList();
+      continue;
+    }
+    if (line.startsWith("## ") || line.startsWith("### ")) {
+      flushPara();
+      flushList();
+      const content = line.replace(/^#{2,3}\s+/, "").trim();
+      blocks.push(
+        <h3
+          key={`h-${blockKey++}`}
+          className="mt-4 text-sm font-semibold uppercase tracking-wide text-amber-800 first:mt-0 dark:text-amber-300"
+        >
+          {content}
+        </h3>,
+      );
+      continue;
+    }
+    if (line.startsWith("# ")) {
+      flushPara();
+      flushList();
+      blocks.push(
+        <h3
+          key={`h-${blockKey++}`}
+          className="mt-4 text-sm font-semibold uppercase tracking-wide text-amber-800 first:mt-0 dark:text-amber-300"
+        >
+          {line.slice(2).trim()}
+        </h3>,
+      );
+      continue;
+    }
+    if (line.startsWith("- ") || line.startsWith("* ")) {
+      flushPara();
+      const content = line.slice(2).trim();
+      listBuf.push(
+        <li key={`li-${listBuf.length}`}>{renderInline(content)}</li>,
+      );
+      continue;
+    }
+    paraBuf.push(line);
+  }
+  flushPara();
+  flushList();
+  return <>{blocks}</>;
 }
 
 export function LawChat({ slug }: { slug: string }) {
@@ -250,16 +358,20 @@ function TurnRow({
       <p className="text-[13px] font-medium text-amber-800 dark:text-amber-300">
         <span className="opacity-60">Вие:</span> {question}
       </p>
-      <div className="mt-2 text-[0.95rem] leading-relaxed text-black/85 dark:text-white/85">
+      <div className="mt-2 text-black/85 dark:text-white/85">
         {answer ? (
-          <p className="whitespace-pre-line">{answer}</p>
+          <div>
+            {renderMarkdown(answer)}
+            {streaming && (
+              <span className="ml-1 inline-block h-3 w-2 animate-pulse bg-amber-600 align-middle dark:bg-amber-400" />
+            )}
+          </div>
         ) : (
           <p className="text-sm text-black/50 italic dark:text-white/50">
-            <span className="animate-pulse">Чета закона и подготвям отговор…</span>
+            <span className="animate-pulse">
+              Търся в 1240 закона и подготвям отговор…
+            </span>
           </p>
-        )}
-        {streaming && answer && (
-          <span className="ml-1 inline-block h-3 w-2 animate-pulse bg-amber-600 align-middle dark:bg-amber-400" />
         )}
       </div>
 
