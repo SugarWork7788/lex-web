@@ -17,6 +17,12 @@ const COURT_LABEL: Record<string, string> = {
   ks: "КС",
 };
 
+const COURT_FULL_NAME: Record<string, string> = {
+  vks: "Върховния касационен съд",
+  vas: "Върховния административен съд",
+  ks: "Конституционния съд",
+};
+
 const BADGE_COLORS: Record<string, string> = {
   SC: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-200",
   SA: "bg-teal-100 text-teal-800 dark:bg-teal-900/50 dark:text-teal-200",
@@ -107,10 +113,10 @@ export default async function CourtPage({ params, searchParams }: Props) {
         {items.length === 0 ? (
           <div className="rounded-xl border border-black/[0.08] dark:border-white/[0.08] px-8 py-16 text-center">
             <p className="font-serif text-lg text-black/60 dark:text-white/60">
-              Решения се зареждат…
+              Все още няма решения от {COURT_FULL_NAME[court] ?? COURT_LABEL[court]}
             </p>
             <p className="mt-2 text-sm text-black/45 dark:text-white/45">
-              Скрейпването е в процес. Провери след малко.
+              Базата данни се попълва. Провери отново скоро.
             </p>
           </div>
         ) : (
