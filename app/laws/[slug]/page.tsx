@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getLawBySlug, getLawArticles, getCrossReferencesFrom } from "@/lib/queries";
+import { getReferencedLawCount } from "@/lib/analyze-context";
 
 export const revalidate = 3600;
 
@@ -20,10 +21,11 @@ export async function generateMetadata({ params }: Props) {
 
 export default async function LawReaderPage({ params }: Props) {
   const { slug } = await params;
-  const [law, articles, xrefs] = await Promise.all([
+  const [law, articles, xrefs, refLawCount] = await Promise.all([
     getLawBySlug(slug),
     getLawArticles(slug),
     getCrossReferencesFrom(slug),
+    getReferencedLawCount(slug),
   ]);
 
   if (!law) notFound();
@@ -75,6 +77,24 @@ export default async function LawReaderPage({ params }: Props) {
             източник на lex.bg ↗
           </a>
         </p>
+        {articles.length > 0 && (
+          <div className="mt-5">
+            <Link
+              href={`/analyze/${slug}`}
+              className="inline-flex items-center gap-2 rounded-md bg-amber-700 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-amber-800 dark:bg-amber-600 dark:hover:bg-amber-500"
+            >
+              <span aria-hidden>✦</span> Анализирай с AI — проверка за правни
+              конфликти
+            </Link>
+            <p className="mt-2 text-xs text-black/55 dark:text-white/55">
+              {refLawCount > 0
+                ? `Проверява срещу Конституцията и ${refLawCount} ${
+                    refLawCount === 1 ? "свързан закон" : "свързани закона"
+                  }`
+                : "Проверява срещу Конституцията"}
+            </p>
+          </div>
+        )}
       </header>
 
       {articles.length === 0 ? (

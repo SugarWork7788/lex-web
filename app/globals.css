@@ -38,3 +38,23 @@ body {
     color: #fef3c7;
   }
 }
+
+/* Print: clean report for the AI analysis page */
+@media print {
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+  header,
+  footer,
+  nav {
+    display: none !important;
+  }
+  .print\:hidden {
+    display: none !important;
+  }
+  .print-area li {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
