@@ -85,6 +85,9 @@ export default function RootLayout({
               <Link href="/compare" className="hover:underline underline-offset-4">
                 Сравни
               </Link>
+              <Link href="/map" className="hover:underline underline-offset-4">
+                Правна карта
+              </Link>
               <Link href="/alerts" className="hover:underline underline-offset-4">
                 Известия
               </Link>
