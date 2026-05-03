@@ -15,10 +15,31 @@ const serif = Source_Serif_4({
   display: "swap",
 });
 
+const SITE_URL = "https://lex-web-eta.vercel.app";
+const SITE_NAME = "lex.bg";
+const SITE_DESC =
+  "Българско законодателство, съдебна практика на ВКС/ВАС/КС и приложимото европейско право — на едно място, с AI анализ.";
+
 export const metadata: Metadata = {
-  title: "lex.bg • Българско законодателство",
-  description:
-    "Търсене и преглед на българското законодателство — конституция, кодекси, закони, наредби и правилници.",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: `${SITE_NAME} • Българско законодателство`,
+    template: `%s • ${SITE_NAME}`,
+  },
+  description: SITE_DESC,
+  openGraph: {
+    type: "website",
+    locale: "bg_BG",
+    siteName: SITE_NAME,
+    title: `${SITE_NAME} • Българско законодателство`,
+    description: SITE_DESC,
+    url: SITE_URL,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${SITE_NAME} • Българско законодателство`,
+    description: SITE_DESC,
+  },
 };
 
 export default function RootLayout({

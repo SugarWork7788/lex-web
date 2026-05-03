@@ -8,6 +8,22 @@ import {
 
 export const revalidate = 3600;
 
+const HOME_DESC =
+  "Цялото българско законодателство, съдебна практика на върховните съдилища и приложимото европейско право, обогатени с AI резюмета, чат и многостъпков правен анализ.";
+
+export const metadata = {
+  title: "Българско законодателство и съдебна практика",
+  description: HOME_DESC,
+  openGraph: {
+    title: "lex.bg • Българско законодателство",
+    description: HOME_DESC,
+  },
+  twitter: {
+    title: "lex.bg • Българско законодателство",
+    description: HOME_DESC,
+  },
+};
+
 export default async function HomePage() {
   const [lawCounts, courtCounts, euCounts] = await Promise.all([
     getCategoryCounts(),

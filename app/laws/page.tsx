@@ -4,6 +4,18 @@ import { listLaws } from "@/lib/queries";
 
 export const revalidate = 3600;
 
+const LAWS_DESC =
+  "Каталог на 1240 български нормативни акта — конституция, кодекси, закони, наредби и правилници. Пълен текст с AI чат и многостъпков анализ за всеки.";
+
+export const metadata = {
+  title: "Закони",
+  description: LAWS_DESC,
+  openGraph: {
+    title: "Закони • lex.bg",
+    description: LAWS_DESC,
+  },
+};
+
 type Props = {
   searchParams: Promise<{ category?: string }>;
 };
