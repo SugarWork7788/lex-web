@@ -8,6 +8,7 @@ import {
   type IssueListItem,
 } from "@/lib/queries";
 import type { Severity } from "@/lib/supabase";
+import { IssueChatButton } from "./issue-chat-button";
 
 export const revalidate = 300;
 
@@ -390,7 +391,8 @@ function IssueRow({ issue }: { issue: IssueListItem }) {
         </div>
       )}
 
-      <div className="mt-3 flex justify-end text-xs">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+        <IssueChatButton issueId={issue.id} />
         <Link
           href={`/analyze/${issue.law_slug}`}
           className="text-amber-700 hover:underline dark:text-amber-400"
