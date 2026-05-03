@@ -39,3 +39,46 @@ export type CrossReference = {
   raw_text: string;
   matched: boolean;
 };
+
+export type Severity = "нисък" | "среден" | "висок";
+
+export type StoredAnalysis = {
+  id: string;
+  law_slug: string;
+  law_name_bg: string;
+  analyzed_at: string;
+  laws_analyzed: number;
+  duration_seconds: number | null;
+  total_issues: number;
+  issues_high: number;
+  issues_medium: number;
+  issues_low: number;
+};
+
+export type StoredIssue = {
+  id: string;
+  analysis_id: string;
+  law_slug: string;
+  type: string;
+  severity: Severity;
+  explanation: string;
+  primary_law_slug: string;
+  primary_articles: string[];
+  conflicting_law_slug: string | null;
+  conflicting_articles: string[];
+  quote_primary: string | null;
+  quote_conflicting: string | null;
+  verified: boolean | null;
+  refined_explanation: string | null;
+  created_at: string;
+};
+
+export type StoredAlert = {
+  id: string;
+  email: string;
+  law_slug: string;
+  law_name_bg: string;
+  confirmed: boolean;
+  token: string;
+  created_at: string;
+};

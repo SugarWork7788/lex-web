@@ -229,6 +229,8 @@ export function AnalysisStream({
   const [usedCache, setUsedCache] = useState(false);
   const [cacheAgeMin, setCacheAgeMin] = useState<number | null>(null);
   const [elapsedMs, setElapsedMs] = useState(0);
+  const [savedAnalysisId, setSavedAnalysisId] = useState<string | null>(null);
+  const [saveFailed, setSaveFailed] = useState<string | null>(null);
   const [filter, setFilter] = useState<IssueType | null>(null);
   const [retryToken, setRetryToken] = useState(0);
   const startedRef = useRef(false);
@@ -257,6 +259,8 @@ export function AnalysisStream({
     setCacheAgeMin(null);
     setElapsedMs(0);
     setLawsMap({ [targetSlug]: targetName });
+    setSavedAnalysisId(null);
+    setSaveFailed(null);
     startedAtRef.current = Date.now();
 
     (async () => {
@@ -330,6 +334,12 @@ export function AnalysisStream({
                 note: typeof ev.note === "string" ? ev.note : prev[id]?.note,
               },
             }));
+          } else if (type === "saved") {
+            const id = typeof ev.analysis_id === "string" ? ev.analysis_id : null;
+            if (id) setSavedAnalysisId(id);
+          } else if (type === "save_failed") {
+            const reason = typeof ev.reason === "string" ? ev.reason : "грешка";
+            setSaveFailed(reason);
           } else if (type === "done") {
             setStatus("done");
           } else if (type === "fatal") {
@@ -450,6 +460,22 @@ export function AnalysisStream({
               · преди {cacheAgeMin} {cacheAgeMin === 1 ? "минута" : "минути"}
             </span>
           )}
+        </div>
+      )}
+
+      {savedAnalysisId && (
+        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs text-emerald-900 dark:border-emerald-800/60 dark:bg-emerald-950/30 dark:text-emerald-200 print:hidden">
+          <span>✓ Анализът е запазен.</span>
+          <a href="/issues" className="font-medium underline-offset-2 hover:underline">
+            Вижте всички анализи →
+          </a>
+        </div>
+      )}
+
+      {saveFailed && (
+        <div className="mb-3 inline-flex items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-200 print:hidden">
+          <span aria-hidden>⚠</span>
+          Запазването на анализа не успя ({saveFailed}). Резултатите тук са валидни.
         </div>
       )}
 

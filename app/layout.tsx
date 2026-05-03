@@ -41,7 +41,7 @@ export default function RootLayout({
               lex<span className="text-amber-700 dark:text-amber-400">·</span>
               <span className="font-normal">brain</span>
             </Link>
-            <nav className="flex gap-6 text-sm">
+            <nav className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
               <Link href="/laws" className="hover:underline underline-offset-4">
                 Закони
               </Link>
@@ -51,6 +51,15 @@ export default function RootLayout({
                 title="Изберете закон, за да стартирате AI анализ"
               >
                 Правен анализ
+              </Link>
+              <Link href="/issues" className="hover:underline underline-offset-4">
+                Проблеми
+              </Link>
+              <Link href="/compare" className="hover:underline underline-offset-4">
+                Сравни
+              </Link>
+              <Link href="/alerts" className="hover:underline underline-offset-4">
+                Известия
               </Link>
               <Link href="/search" className="hover:underline underline-offset-4">
                 Търсене

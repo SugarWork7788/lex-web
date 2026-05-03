@@ -10,6 +10,7 @@ import {
   type Pass2Stats,
   type SearchProgress,
 } from "@/lib/analyze-context";
+import { supabase } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -104,8 +105,87 @@ type StreamEvent =
   | { event: "laws_map"; laws_map: Record<string, string>; stats: unknown; cached?: boolean }
   | { event: "issue"; id: string; [k: string]: unknown }
   | { event: "issue_update"; id: string; [k: string]: unknown }
+  | { event: "saved"; analysis_id: string }
+  | { event: "save_failed"; reason: string }
   | { event: "done"; total: number }
   | { event: "fatal"; message: string };
+
+type RuntimeUpdate = {
+  verified?: boolean;
+  refined_explanation?: string;
+};
+
+async function persistAnalysis(args: {
+  targetSlug: string;
+  targetName: string;
+  lawsAnalyzedCount: number;
+  durationSeconds: number;
+  issues: Array<Record<string, unknown> & { id: string }>;
+  updates: Map<string, RuntimeUpdate>;
+}): Promise<{ id: string } | { error: string }> {
+  const sevCount = { висок: 0, среден: 0, нисък: 0 };
+  for (const i of args.issues) {
+    const sev = (i as Record<string, unknown>).severity;
+    if (sev === "висок" || sev === "среден" || sev === "нисък") sevCount[sev]++;
+  }
+
+  const { data: analysisRow, error: insErr } = await supabase
+    .from("law_analyses")
+    .insert({
+      law_slug: args.targetSlug,
+      law_name_bg: args.targetName,
+      laws_analyzed: args.lawsAnalyzedCount,
+      duration_seconds: args.durationSeconds,
+      total_issues: args.issues.length,
+      issues_high: sevCount["висок"],
+      issues_medium: sevCount["среден"],
+      issues_low: sevCount["нисък"],
+    })
+    .select("id")
+    .single();
+  if (insErr || !analysisRow) {
+    return { error: insErr?.message ?? "insert returned no row" };
+  }
+
+  if (args.issues.length > 0) {
+    const rows = args.issues.map((i) => {
+      const r = i as Record<string, unknown>;
+      const u = args.updates.get(i.id) ?? {};
+      const sev = r.severity === "висок" || r.severity === "среден" || r.severity === "нисък" ? r.severity : "среден";
+      const arr = (v: unknown): string[] =>
+        Array.isArray(v) ? v.map(String).filter(Boolean) : [];
+      return {
+        analysis_id: analysisRow.id,
+        law_slug: args.targetSlug,
+        type: typeof r.type === "string" ? r.type : "НЕЯСНА ФОРМУЛИРОВКА",
+        severity: sev,
+        explanation: typeof r.explanation === "string" ? r.explanation : "",
+        primary_law_slug:
+          typeof r.primary_law_slug === "string" ? r.primary_law_slug : args.targetSlug,
+        primary_articles: arr(r.primary_articles),
+        conflicting_law_slug:
+          typeof r.conflicting_law_slug === "string" && r.conflicting_law_slug
+            ? r.conflicting_law_slug
+            : null,
+        conflicting_articles: arr(r.conflicting_articles),
+        quote_primary: typeof r.quote_primary === "string" ? r.quote_primary : null,
+        quote_conflicting:
+          typeof r.quote_conflicting === "string" ? r.quote_conflicting : null,
+        verified: typeof u.verified === "boolean" ? u.verified : null,
+        refined_explanation:
+          typeof u.refined_explanation === "string" && u.refined_explanation
+            ? u.refined_explanation
+            : null,
+      };
+    });
+    const { error: issuesErr } = await supabase.from("law_issues").insert(rows);
+    if (issuesErr) {
+      return { error: issuesErr.message };
+    }
+  }
+
+  return { id: analysisRow.id };
+}
 
 // ---- Prompt builders ----
 
@@ -171,6 +251,7 @@ export async function POST(
 ) {
   const { slug } = await ctx.params;
   const encoder = new TextEncoder();
+  const startedAt = Date.now();
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -443,6 +524,8 @@ export async function POST(
           })
           .slice(0, 3);
 
+        const runtimeUpdates = new Map<string, RuntimeUpdate>();
+
         if (highIssues.length > 0) {
           emit({
             event: "phase",
@@ -503,6 +586,10 @@ export async function POST(
                   });
                   return;
                 }
+                runtimeUpdates.set(issue.id, {
+                  verified: Boolean(result.verified),
+                  refined_explanation: result.refined_explanation ?? "",
+                });
                 emit({
                   event: "issue_update",
                   id: issue.id,
@@ -524,6 +611,31 @@ export async function POST(
               }
             }),
           );
+        }
+
+        // ---- PERSIST: save analysis + issues to Supabase ----
+        const lawsAnalyzedCount =
+          1 + (constitution ? 1 : 0) + relatedLaws.length;
+        const durationSeconds = Math.round((Date.now() - startedAt) / 1000);
+        try {
+          const result = await persistAnalysis({
+            targetSlug: slug,
+            targetName: target.name_bg,
+            lawsAnalyzedCount,
+            durationSeconds,
+            issues,
+            updates: runtimeUpdates,
+          });
+          if ("error" in result) {
+            console.error(`[analyze:${slug}] save failed: ${result.error}`);
+            emit({ event: "save_failed", reason: result.error });
+          } else {
+            emit({ event: "saved", analysis_id: result.id });
+          }
+        } catch (saveErr) {
+          const msg = saveErr instanceof Error ? saveErr.message : String(saveErr);
+          console.error(`[analyze:${slug}] save threw: ${msg}`);
+          emit({ event: "save_failed", reason: msg });
         }
 
         emit({ event: "done", total: issues.length });

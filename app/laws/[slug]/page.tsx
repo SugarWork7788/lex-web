@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getLawBySlug, getLawArticles, getCrossReferencesFrom } from "@/lib/queries";
+import { LawChat } from "./chat";
+import { AlertForm } from "./alert-form";
 
 export const revalidate = 3600;
 
@@ -136,6 +138,10 @@ export default async function LawReaderPage({ params }: Props) {
           ))}
         </div>
       )}
+
+      {articles.length > 0 && <LawChat slug={slug} />}
+
+      {articles.length > 0 && <AlertForm slug={slug} nameBg={law.name_bg} />}
 
       {xrefs.length > 0 && (
         <aside className="mt-16 border-t border-black/[0.08] dark:border-white/[0.08] pt-6">

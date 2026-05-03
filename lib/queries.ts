@@ -1,4 +1,11 @@
-import { supabase, type Law, type LawArticle, type CrossReference } from "./supabase";
+import {
+  supabase,
+  type Law,
+  type LawArticle,
+  type CrossReference,
+  type Severity,
+  type StoredIssue,
+} from "./supabase";
 
 export async function getCategoryCounts(): Promise<Record<string, number>> {
   // PostgREST caps rows at db-max-rows (1000), so we paginate the category
@@ -94,4 +101,172 @@ export async function searchArticles(query: string, limit = 50): Promise<SearchH
   });
   if (error) throw new Error(`searchArticles: ${error.message}`);
   return (data ?? []) as SearchHit[];
+}
+
+// ============================================================
+// Stored analyses & issues
+// ============================================================
+
+export type IssueListFilters = {
+  severity?: Severity;
+  type?: string;
+  law?: string;
+  verified?: boolean;
+};
+
+export type IssueListItem = StoredIssue & {
+  law_name_bg: string;
+  analyzed_at: string;
+};
+
+export type IssueListResult = {
+  items: IssueListItem[];
+  totalCount: number;
+};
+
+export async function listStoredIssues(
+  filters: IssueListFilters,
+  page: number,
+  pageSize: number,
+  sort: "severity" | "date" | "type" = "severity",
+): Promise<IssueListResult> {
+  let q = supabase
+    .from("law_issues")
+    .select(
+      `id, analysis_id, law_slug, type, severity, explanation,
+       primary_law_slug, primary_articles, conflicting_law_slug,
+       conflicting_articles, quote_primary, quote_conflicting,
+       verified, refined_explanation, created_at,
+       law_analyses!inner(law_name_bg, analyzed_at)`,
+      { count: "exact" },
+    );
+
+  if (filters.severity) q = q.eq("severity", filters.severity);
+  if (filters.type) q = q.eq("type", filters.type);
+  if (filters.law) q = q.eq("law_slug", filters.law);
+  if (filters.verified === true) q = q.eq("verified", true);
+
+  if (sort === "date") {
+    q = q.order("created_at", { ascending: false });
+  } else if (sort === "type") {
+    q = q.order("type", { ascending: true }).order("created_at", { ascending: false });
+  } else {
+    // severity (default): висок < среден < нисък alphabetic doesn't help; rely on a
+    // computed mapping via two ordered fetches won't be clean. Use a CASE via PostgREST
+    // is awkward — fall back to client-side severity sort applied to the page slice.
+    q = q.order("created_at", { ascending: false });
+  }
+
+  const from = page * pageSize;
+  const to = from + pageSize - 1;
+  q = q.range(from, to);
+
+  const { data, error, count } = await q;
+  if (error) throw new Error(`listStoredIssues: ${error.message}`);
+
+  const SEV_RANK: Record<Severity, number> = { висок: 0, среден: 1, нисък: 2 };
+
+  type Row = StoredIssue & {
+    law_analyses: { law_name_bg: string; analyzed_at: string }[] | { law_name_bg: string; analyzed_at: string };
+  };
+  const items: IssueListItem[] = (data as Row[] | null ?? []).map((r) => {
+    const meta = Array.isArray(r.law_analyses) ? r.law_analyses[0] : r.law_analyses;
+    return {
+      id: r.id,
+      analysis_id: r.analysis_id,
+      law_slug: r.law_slug,
+      type: r.type,
+      severity: r.severity,
+      explanation: r.explanation,
+      primary_law_slug: r.primary_law_slug,
+      primary_articles: r.primary_articles,
+      conflicting_law_slug: r.conflicting_law_slug,
+      conflicting_articles: r.conflicting_articles,
+      quote_primary: r.quote_primary,
+      quote_conflicting: r.quote_conflicting,
+      verified: r.verified,
+      refined_explanation: r.refined_explanation,
+      created_at: r.created_at,
+      law_name_bg: meta?.law_name_bg ?? r.law_slug,
+      analyzed_at: meta?.analyzed_at ?? r.created_at,
+    };
+  });
+
+  if (sort === "severity") {
+    items.sort((a, b) => {
+      const r = SEV_RANK[a.severity] - SEV_RANK[b.severity];
+      if (r !== 0) return r;
+      return b.created_at.localeCompare(a.created_at);
+    });
+  }
+
+  return { items, totalCount: count ?? items.length };
+}
+
+export async function getIssuesSummary(): Promise<{
+  totalIssues: number;
+  totalAnalyses: number;
+  lawsAnalyzed: number;
+}> {
+  const [issuesRes, analysesRes, lawsRes] = await Promise.all([
+    supabase.from("law_issues").select("id", { count: "exact", head: true }),
+    supabase
+      .from("law_analyses")
+      .select("id", { count: "exact", head: true }),
+    supabase.from("law_analyses").select("law_slug"),
+  ]);
+  if (issuesRes.error) throw new Error(`getIssuesSummary issues: ${issuesRes.error.message}`);
+  if (analysesRes.error) throw new Error(`getIssuesSummary analyses: ${analysesRes.error.message}`);
+  if (lawsRes.error) throw new Error(`getIssuesSummary laws: ${lawsRes.error.message}`);
+
+  const distinctLaws = new Set<string>();
+  for (const r of (lawsRes.data ?? []) as { law_slug: string }[]) distinctLaws.add(r.law_slug);
+
+  return {
+    totalIssues: issuesRes.count ?? 0,
+    totalAnalyses: analysesRes.count ?? 0,
+    lawsAnalyzed: distinctLaws.size,
+  };
+}
+
+export async function getProblematicLawsLeaderboard(
+  limit = 10,
+): Promise<{ law_slug: string; law_name_bg: string; issue_count: number }[]> {
+  // PostgREST has no GROUP BY; client-side aggregate.
+  const PAGE = 1000;
+  const counts = new Map<string, { name: string; n: number }>();
+  for (let start = 0; ; start += PAGE) {
+    const { data, error } = await supabase
+      .from("law_issues")
+      .select("law_slug, law_analyses!inner(law_name_bg)")
+      .range(start, start + PAGE - 1);
+    if (error) throw new Error(`leaderboard: ${error.message}`);
+    const chunk = (data ?? []) as {
+      law_slug: string;
+      law_analyses: { law_name_bg: string }[] | { law_name_bg: string };
+    }[];
+    for (const row of chunk) {
+      const meta = Array.isArray(row.law_analyses) ? row.law_analyses[0] : row.law_analyses;
+      const cur = counts.get(row.law_slug);
+      if (cur) cur.n += 1;
+      else
+        counts.set(row.law_slug, {
+          name: meta?.law_name_bg ?? row.law_slug,
+          n: 1,
+        });
+    }
+    if (chunk.length < PAGE) break;
+  }
+  return [...counts.entries()]
+    .map(([law_slug, v]) => ({ law_slug, law_name_bg: v.name, issue_count: v.n }))
+    .sort((a, b) => b.issue_count - a.issue_count)
+    .slice(0, limit);
+}
+
+export async function getDistinctIssueTypes(): Promise<string[]> {
+  const { data, error } = await supabase.from("law_issues").select("type");
+  if (error) throw new Error(`getDistinctIssueTypes: ${error.message}`);
+  const set = new Set<string>();
+  for (const r of (data ?? []) as { type: string }[]) set.add(r.type);
+  return [...set].sort();
 }
