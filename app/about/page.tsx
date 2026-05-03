@@ -121,6 +121,32 @@ export default async function AboutPage() {
         </ul>
       </section>
 
+      <section className="mt-12">
+        <h2 className="font-serif text-2xl font-semibold">Технологии</h2>
+        <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+          <TechCard
+            name="Next.js 16"
+            url="https://nextjs.org"
+            description="Сървърни компоненти, App Router, стрийминг отговори от AI крайни точки."
+          />
+          <TechCard
+            name="Supabase (Postgres)"
+            url="https://supabase.com"
+            description="Хранилище за закони, съдебни решения и ЕС актове, с пълнотекстово търсене (tsvector)."
+          />
+          <TechCard
+            name="Claude AI"
+            url="https://www.anthropic.com"
+            description="Резюмета, чат и многостъпков правен анализ — задвижвани от Claude Sonnet 4.6 на Anthropic."
+          />
+          <TechCard
+            name="Vercel"
+            url="https://vercel.com"
+            description="Хостинг и доставка на края на мрежата, с автоматично обновяване при всеки git push."
+          />
+        </ul>
+      </section>
+
       <section className="mt-12 rounded-lg border border-amber-300 bg-amber-50 p-5 dark:border-amber-800/60 dark:bg-amber-950/30">
         <h2 className="font-serif text-xl font-semibold text-amber-900 dark:text-amber-200">
           Важно — отказ от отговорност
@@ -213,6 +239,32 @@ function SourceCard({
         </span>
       </div>
       <p className="mt-2 text-sm leading-relaxed text-black/70 dark:text-white/70">
+        {description}
+      </p>
+    </li>
+  );
+}
+
+function TechCard({
+  name,
+  url,
+  description,
+}: {
+  name: string;
+  url: string;
+  description: string;
+}) {
+  return (
+    <li className="rounded-lg border border-black/[0.08] bg-white p-4 dark:border-white/[0.1] dark:bg-white/[0.03]">
+      <a
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        className="font-serif text-base font-semibold hover:underline"
+      >
+        {name} ↗
+      </a>
+      <p className="mt-1.5 text-sm leading-relaxed text-black/70 dark:text-white/70">
         {description}
       </p>
     </li>
