@@ -51,131 +51,155 @@ export default async function LawReaderPage({ params }: Props) {
     curSection.articles.push(a);
   }
 
+  const hasArticles = articles.length > 0;
+
   return (
-    <article className="mx-auto max-w-3xl px-6 py-10 law-prose">
-      <nav className="text-sm">
-        <Link
-          href={`/laws?category=${law.category}`}
-          className="text-black/60 dark:text-white/60 hover:underline"
-        >
-          ← {law.level_name ?? "Закон"}
-        </Link>
-      </nav>
-
-      <header className="mt-4 border-b border-black/[0.08] dark:border-white/[0.08] pb-6">
-        <h1 className="font-serif text-3xl sm:text-4xl font-semibold tracking-tight leading-tight">
-          {law.name_bg}
-        </h1>
-        <p className="mt-3 text-sm text-black/60 dark:text-white/60">
-          {law.article_count.toLocaleString("bg-BG")} члена •{" "}
-          <a
-            href={law.url}
-            className="hover:underline"
-            target="_blank"
-            rel="noreferrer"
-          >
-            източник на lex.bg ↗
-          </a>
-        </p>
-        {articles.length > 0 && (
-          <div className="mt-5">
+    <div
+      className={
+        hasArticles ? "flex flex-col md:flex-row md:items-start" : ""
+      }
+    >
+      {/* LEFT COLUMN — law header + articles + xrefs + alert form */}
+      <article
+        className={
+          hasArticles
+            ? "law-prose w-full px-6 py-10 md:w-[60%]"
+            : "law-prose mx-auto max-w-3xl px-6 py-10"
+        }
+      >
+        <div className={hasArticles ? "mx-auto max-w-3xl" : ""}>
+          <nav className="text-sm">
             <Link
-              href={`/analyze/${slug}`}
-              className="inline-flex items-center gap-2 rounded-md bg-amber-700 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-amber-800 dark:bg-amber-600 dark:hover:bg-amber-500"
+              href={`/laws?category=${law.category}`}
+              className="text-black/60 dark:text-white/60 hover:underline"
             >
-              <span aria-hidden>✦</span> Анализирай с AI — проверка за правни
-              конфликти
+              ← {law.level_name ?? "Закон"}
             </Link>
-            <p className="mt-2 text-xs text-black/55 dark:text-white/55">
-              Многостъпков анализ срещу Конституцията и цялата база от 1240
-              български закона
-            </p>
-          </div>
-        )}
-      </header>
+          </nav>
 
-      {articles.length === 0 ? (
-        <p className="mt-12 text-black/60 dark:text-white/60">
-          За този акт все още няма заредено съдържание.
-        </p>
-      ) : (
-        <div className="mt-10 space-y-12">
-          {groups.map((g, gi) => (
-            <section key={gi}>
-              {g.chapter && (
-                <h2 className="font-serif text-2xl font-semibold tracking-tight">
-                  {g.chapter}
-                </h2>
-              )}
-              <div className={g.chapter ? "mt-6 space-y-8" : "space-y-8"}>
-                {g.sections.map((s, si) => (
-                  <div key={si}>
-                    {s.section && (
-                      <h3 className="font-serif text-lg font-semibold text-black/80 dark:text-white/80">
-                        {s.section}
-                      </h3>
-                    )}
-                    <div className={s.section ? "mt-4 space-y-6" : "space-y-6"}>
-                      {s.articles.map((a) => (
-                        <div
-                          key={a.ordinal}
-                          id={`art-${a.article_number}`}
-                          className="scroll-mt-16"
-                        >
-                          <div className="font-serif font-semibold mb-1">
-                            Чл. {a.article_number}
-                          </div>
-                          <div className="font-serif leading-relaxed whitespace-pre-line text-[1.0625rem]">
-                            {a.text_content}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+          <header className="mt-4 border-b border-black/[0.08] dark:border-white/[0.08] pb-6">
+            <h1 className="font-serif text-3xl sm:text-4xl font-semibold tracking-tight leading-tight">
+              {law.name_bg}
+            </h1>
+            <p className="mt-3 text-sm text-black/60 dark:text-white/60">
+              {law.article_count.toLocaleString("bg-BG")} члена •{" "}
+              <a
+                href={law.url}
+                className="hover:underline"
+                target="_blank"
+                rel="noreferrer"
+              >
+                източник на lex.bg ↗
+              </a>
+            </p>
+            {hasArticles && (
+              <div className="mt-5">
+                <Link
+                  href={`/analyze/${slug}`}
+                  className="inline-flex items-center gap-2 rounded-md bg-amber-700 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-amber-800 dark:bg-amber-600 dark:hover:bg-amber-500"
+                >
+                  <span aria-hidden>✦</span> Анализирай с AI — проверка за
+                  правни конфликти
+                </Link>
+                <p className="mt-2 text-xs text-black/55 dark:text-white/55">
+                  Многостъпков анализ срещу Конституцията и цялата база от 1240
+                  български закона
+                </p>
               </div>
-            </section>
-          ))}
-        </div>
-      )}
+            )}
+          </header>
 
-      {articles.length > 0 && <LawChat slug={slug} />}
-
-      {articles.length > 0 && <AlertForm slug={slug} nameBg={law.name_bg} />}
-
-      {xrefs.length > 0 && (
-        <aside className="mt-16 border-t border-black/[0.08] dark:border-white/[0.08] pt-6">
-          <h2 className="font-serif text-xl font-semibold mb-4">
-            Препратки към други актове
-          </h2>
-          <ul className="text-sm space-y-1">
-            {xrefs.slice(0, 50).map((x, i) => (
-              <li key={i} className="text-black/75 dark:text-white/75">
-                {x.from_article && (
-                  <span className="text-black/55 dark:text-white/55">
-                    Чл. {x.from_article} →{" "}
-                  </span>
-                )}
-                {x.to_slug ? (
-                  <Link
-                    href={`/laws/${x.to_slug}`}
-                    className="hover:underline"
-                  >
-                    {x.raw_text}
-                  </Link>
-                ) : (
-                  <span>{x.raw_text}</span>
-                )}
-              </li>
-            ))}
-          </ul>
-          {xrefs.length > 50 && (
-            <p className="mt-2 text-xs text-black/55 dark:text-white/55">
-              … и още {xrefs.length - 50}.
+          {!hasArticles ? (
+            <p className="mt-12 text-black/60 dark:text-white/60">
+              За този акт все още няма заредено съдържание.
             </p>
+          ) : (
+            <div className="mt-10 space-y-12">
+              {groups.map((g, gi) => (
+                <section key={gi}>
+                  {g.chapter && (
+                    <h2 className="font-serif text-2xl font-semibold tracking-tight">
+                      {g.chapter}
+                    </h2>
+                  )}
+                  <div className={g.chapter ? "mt-6 space-y-8" : "space-y-8"}>
+                    {g.sections.map((s, si) => (
+                      <div key={si}>
+                        {s.section && (
+                          <h3 className="font-serif text-lg font-semibold text-black/80 dark:text-white/80">
+                            {s.section}
+                          </h3>
+                        )}
+                        <div
+                          className={s.section ? "mt-4 space-y-6" : "space-y-6"}
+                        >
+                          {s.articles.map((a) => (
+                            <div
+                              key={a.ordinal}
+                              id={`art-${a.article_number}`}
+                              className="scroll-mt-16"
+                            >
+                              <div className="font-serif font-semibold mb-1">
+                                Чл. {a.article_number}
+                              </div>
+                              <div className="font-serif leading-relaxed whitespace-pre-line text-[1.0625rem]">
+                                {a.text_content}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
           )}
+
+          {xrefs.length > 0 && (
+            <aside className="mt-16 border-t border-black/[0.08] dark:border-white/[0.08] pt-6">
+              <h2 className="font-serif text-xl font-semibold mb-4">
+                Препратки към други актове
+              </h2>
+              <ul className="text-sm space-y-1">
+                {xrefs.slice(0, 50).map((x, i) => (
+                  <li key={i} className="text-black/75 dark:text-white/75">
+                    {x.from_article && (
+                      <span className="text-black/55 dark:text-white/55">
+                        Чл. {x.from_article} →{" "}
+                      </span>
+                    )}
+                    {x.to_slug ? (
+                      <Link
+                        href={`/laws/${x.to_slug}`}
+                        className="hover:underline"
+                      >
+                        {x.raw_text}
+                      </Link>
+                    ) : (
+                      <span>{x.raw_text}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              {xrefs.length > 50 && (
+                <p className="mt-2 text-xs text-black/55 dark:text-white/55">
+                  … и още {xrefs.length - 50}.
+                </p>
+              )}
+            </aside>
+          )}
+
+          {hasArticles && <AlertForm slug={slug} nameBg={law.name_bg} />}
+        </div>
+      </article>
+
+      {/* RIGHT COLUMN — sticky chat panel (md+); stacked below on mobile */}
+      {hasArticles && (
+        <aside className="w-full border-t border-black/[0.08] dark:border-white/[0.08] md:sticky md:top-0 md:h-screen md:w-[40%] md:border-l md:border-t-0">
+          <LawChat slug={slug} />
         </aside>
       )}
-    </article>
+    </div>
   );
 }
