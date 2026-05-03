@@ -33,7 +33,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col font-sans">
         <header className="border-b border-black/[0.08] dark:border-white/[0.08]">
-          <div className="mx-auto max-w-5xl px-6 py-4 flex items-center justify-between">
+          <div className="mx-auto max-w-5xl px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6 sm:py-4">
             <Link
               href="/"
               className="font-serif text-xl font-semibold tracking-tight"
@@ -41,7 +41,7 @@ export default function RootLayout({
               lex<span className="text-amber-700 dark:text-amber-400">·</span>
               <span className="font-normal">brain</span>
             </Link>
-            <nav className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
+            <nav className="-mx-1 flex gap-x-4 gap-y-2 overflow-x-auto whitespace-nowrap px-1 text-sm sm:flex-wrap sm:overflow-visible sm:whitespace-normal sm:gap-x-5">
               <Link href="/laws" className="hover:underline underline-offset-4">
                 Закони
               </Link>
@@ -70,14 +70,28 @@ export default function RootLayout({
               <Link href="/search" className="hover:underline underline-offset-4">
                 Търсене
               </Link>
+              <Link href="/about" className="hover:underline underline-offset-4 text-black/65 dark:text-white/65">
+                За платформата
+              </Link>
             </nav>
           </div>
         </header>
         <main className="flex-1">{children}</main>
         <footer className="border-t border-black/[0.08] dark:border-white/[0.08] mt-16">
           <div className="mx-auto max-w-5xl px-6 py-6 text-xs text-black/60 dark:text-white/60">
-            Източник на данните: lex.bg. Този сайт е независим и не е свързан с
-            официалните публикатори.
+            <p>
+              Източник на данните: lex.bg, Конституционен съд, ВКС, ВАС,
+              EUR-Lex. Този сайт е независим и не е свързан с официалните
+              публикатори.
+            </p>
+            <p className="mt-2">
+              <Link href="/about" className="hover:underline">
+                За платформата
+              </Link>
+              {" · "}
+              Резултатите са информативни и не заместват професионален
+              правен съвет.
+            </p>
           </div>
         </footer>
       </body>
