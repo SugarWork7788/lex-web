@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getLawBySlug, getLawArticles, getCrossReferencesFrom } from "@/lib/queries";
 import { LawChat } from "./chat";
 import { AlertForm } from "./alert-form";
+import { RelatedDecisions } from "@/app/components/related-decisions";
 
 export const revalidate = 3600;
 
@@ -189,6 +190,8 @@ export default async function LawReaderPage({ params }: Props) {
               )}
             </aside>
           )}
+
+          {hasArticles && <RelatedDecisions slug={slug} />}
 
           {hasArticles && <AlertForm slug={slug} nameBg={law.name_bg} />}
         </div>

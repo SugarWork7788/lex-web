@@ -1,11 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { getLawBySlug, searchArticles } from "@/lib/queries";
+import { getLawBySlug, searchArticles, searchDecisions, type CourtDecision } from "@/lib/queries";
 import { supabase, type LawArticle, type Severity } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-const SYSTEM_PROMPT = `Ти си правен анализатор на цялото българско законодателство.
+const SYSTEM_PROMPT = `Ти си правен анализатор на цялото българско законодателство и съдебна практика.
 Разполагаш с релевантни членове от 1240 закона и известни правни конфликти от база данни.
 
 За всеки въпрос отговаряй в следната структура (markdown с ## заглавия):
@@ -169,6 +169,7 @@ function buildUserPrompt(args: {
   currentLawArticles: LawArticle[];
   corpusGroups: { slug: string; name_bg: string; articles: LawArticle[] }[];
   issues: RelatedIssue[];
+  courtDecisions: CourtDecision[];
 }): string {
   const fmtArticles = (arts: LawArticle[]) =>
     arts.map((a) => `Чл.${a.article_number}: ${a.text_content}`).join("\n\n");
@@ -216,6 +217,16 @@ function buildUserPrompt(args: {
     parts.push(`ИЗВЕСТНИ ПРАВНИ ПРОБЛЕМИ: (няма записани в базата данни)`);
   }
 
+  if (args.courtDecisions.length > 0) {
+    parts.push("");
+    parts.push(`СВЪРЗАНА СЪДЕБНА ПРАКТИКА:`);
+    for (const d of args.courtDecisions) {
+      const date = (d.decision_date ?? "").slice(0, 10);
+      const title = d.title || d.decision_number || d.case_number || d.id;
+      parts.push(`- [${d.court} | ${date}] ${title}`);
+    }
+  }
+
   parts.push("");
   parts.push(`ВЪПРОС: ${args.question}`);
 
@@ -254,7 +265,7 @@ export async function POST(
   const keyTerms = extractKeyTerms(question);
   const corpusQueries = [question, ...keyTerms];
 
-  const [corpusHitArrays, currentLawHits, storedIssues] = await Promise.all([
+  const [corpusHitArrays, currentLawHits, storedIssues, courtDecisions] = await Promise.all([
     Promise.all(
       corpusQueries.map((q) =>
         searchArticles(q, 20).catch(
@@ -266,6 +277,7 @@ export async function POST(
       .then((hits) => hits.filter((h) => h.law_slug === slug))
       .catch(() => [] as Awaited<ReturnType<typeof searchArticles>>),
     fetchRelatedIssues(slug, MAX_ISSUES),
+    searchDecisions(question, 3).catch(() => [] as CourtDecision[]),
   ]);
 
   // Dedup corpus hits, exclude current law (handled separately).
@@ -301,6 +313,7 @@ export async function POST(
     currentLawArticles,
     corpusGroups,
     issues: storedIssues,
+    courtDecisions,
   });
 
   // Build conversation history.

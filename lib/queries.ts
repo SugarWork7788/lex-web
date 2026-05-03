@@ -444,3 +444,48 @@ export async function getEuRegulation(
   if (error) return null;
   return data as EuRegulationFull;
 }
+
+export async function getDecisionsForLaw(
+  lawSlug: string,
+  limit = 6,
+): Promise<CourtDecision[]> {
+  const { data } = await supabase
+    .from("court_decisions")
+    .select(
+      "id,ecli,court,court_code,act_type,case_number,decision_number,decision_date,year,title,source_url,cited_law_slugs",
+    )
+    .contains("cited_law_slugs", [lawSlug])
+    .order("decision_date", { ascending: false, nullsFirst: false })
+    .limit(limit);
+  return (data ?? []) as CourtDecision[];
+}
+
+export async function searchDecisions(
+  query: string,
+  limit = 5,
+  courtCode?: string,
+): Promise<CourtDecision[]> {
+  try {
+    const { data } = await supabase.rpc("search_decisions", {
+      query,
+      p_court: courtCode ?? null,
+      p_year: null,
+      lim: limit,
+    });
+    if (data && Array.isArray(data) && data.length > 0) {
+      return data as CourtDecision[];
+    }
+  } catch {
+    // RPC not available — fall through to ilike fallback.
+  }
+  let q = supabase
+    .from("court_decisions")
+    .select(
+      "id,ecli,court,court_code,act_type,case_number,decision_number,decision_date,year,title,source_url,cited_law_slugs",
+    )
+    .ilike("full_text", `%${query.slice(0, 100)}%`)
+    .limit(limit);
+  if (courtCode) q = q.eq("court_code", courtCode);
+  const { data } = await q;
+  return (data ?? []) as CourtDecision[];
+}
