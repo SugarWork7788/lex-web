@@ -270,3 +270,177 @@ export async function getDistinctIssueTypes(): Promise<string[]> {
   for (const r of (data ?? []) as { type: string }[]) set.add(r.type);
   return [...set].sort();
 }
+
+// ============================================================
+// Court decisions (КС, ВКС, ВАС)
+// ============================================================
+
+export type CourtDecision = {
+  id: string;
+  ecli: string | null;
+  court: string;
+  court_code: string;
+  act_type: string | null;
+  case_number: string | null;
+  decision_number: string | null;
+  college: string | null;
+  decision_date: string | null;
+  year: number | null;
+  title: string | null;
+  source_url: string;
+  cited_law_slugs: string[];
+};
+
+export type CourtDecisionFull = CourtDecision & {
+  full_text: string;
+};
+
+export async function getCourtCounts(): Promise<Record<string, number>> {
+  const counts: Record<string, number> = {};
+  const PAGE = 1000;
+  for (let start = 0; ; start += PAGE) {
+    const { data, error } = await supabase
+      .from("court_decisions")
+      .select("court_code")
+      .range(start, start + PAGE - 1);
+    if (error) throw new Error(`getCourtCounts: ${error.message}`);
+    const chunk = (data ?? []) as { court_code: string }[];
+    for (const r of chunk) {
+      counts[r.court_code] = (counts[r.court_code] ?? 0) + 1;
+    }
+    if (chunk.length < PAGE) break;
+  }
+  return counts;
+}
+
+export async function listCourtDecisions(opts: {
+  court_code: string;
+  year?: number;
+  page?: number;
+  pageSize?: number;
+}): Promise<{ items: CourtDecision[]; total: number }> {
+  const { court_code, year, page = 0, pageSize = 20 } = opts;
+  let q = supabase
+    .from("court_decisions")
+    .select(
+      "id,ecli,court,court_code,act_type,case_number,decision_number,college,decision_date,year,title,source_url,cited_law_slugs",
+      { count: "exact" },
+    )
+    .eq("court_code", court_code)
+    .not("full_text", "eq", "")
+    .order("decision_date", { ascending: false, nullsFirst: false });
+
+  if (year) q = q.eq("year", year);
+  q = q.range(page * pageSize, page * pageSize + pageSize - 1);
+
+  const { data, count, error } = await q;
+  if (error) throw new Error(`listCourtDecisions: ${error.message}`);
+  return { items: (data ?? []) as CourtDecision[], total: count ?? 0 };
+}
+
+export async function getCourtDecision(
+  id: string,
+): Promise<CourtDecisionFull | null> {
+  const { data, error } = await supabase
+    .from("court_decisions")
+    .select("*")
+    .eq("id", id)
+    .single();
+  if (error) return null;
+  return data as CourtDecisionFull;
+}
+
+export async function getAvailableYears(
+  court_code: string,
+): Promise<number[]> {
+  const { data, error } = await supabase
+    .from("court_decisions")
+    .select("year")
+    .eq("court_code", court_code)
+    .not("year", "is", null);
+  if (error) throw new Error(`getAvailableYears: ${error.message}`);
+  const years = [
+    ...new Set(
+      (data ?? [])
+        .map((r) => (r as { year: number }).year)
+        .filter((y) => Boolean(y)),
+    ),
+  ].sort((a, b) => b - a);
+  return years as number[];
+}
+
+// ============================================================
+// EU Regulations
+// ============================================================
+
+export type EuRegulation = {
+  id: string;
+  celex: string;
+  title_bg: string | null;
+  title_en: string | null;
+  doc_type: string | null;
+  year: number | null;
+  number: string | null;
+  in_force: boolean;
+  date_document: string | null;
+  date_force: string | null;
+  source_url: string | null;
+};
+
+export type EuRegulationFull = EuRegulation & {
+  full_text_bg: string | null;
+  full_text_en: string | null;
+};
+
+export async function getEuCounts(): Promise<Record<string, number>> {
+  const counts: Record<string, number> = {};
+  const PAGE = 1000;
+  for (let start = 0; ; start += PAGE) {
+    const { data, error } = await supabase
+      .from("eu_regulations")
+      .select("doc_type")
+      .range(start, start + PAGE - 1);
+    if (error) throw new Error(`getEuCounts: ${error.message}`);
+    const chunk = (data ?? []) as { doc_type: string | null }[];
+    for (const r of chunk) {
+      const t = r.doc_type ?? "other";
+      counts[t] = (counts[t] ?? 0) + 1;
+    }
+    if (chunk.length < PAGE) break;
+  }
+  return counts;
+}
+
+export async function listEuRegulations(opts: {
+  doc_type?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<{ items: EuRegulation[]; total: number }> {
+  const { doc_type, page = 0, pageSize = 20 } = opts;
+  let q = supabase
+    .from("eu_regulations")
+    .select(
+      "id,celex,title_bg,title_en,doc_type,year,number,in_force,date_document,date_force,source_url",
+      { count: "exact" },
+    )
+    .order("date_document", { ascending: false, nullsFirst: false });
+
+  if (doc_type) q = q.eq("doc_type", doc_type);
+  q = q.range(page * pageSize, page * pageSize + pageSize - 1);
+
+  const { data, count, error } = await q;
+  if (error) throw new Error(`listEuRegulations: ${error.message}`);
+  return { items: (data ?? []) as EuRegulation[], total: count ?? 0 };
+}
+
+export async function getEuRegulation(
+  celex: string,
+): Promise<EuRegulationFull | null> {
+  const { data, error } = await supabase
+    .from("eu_regulations")
+    .select("*")
+    .eq("celex", celex)
+    .single();
+  if (error) return null;
+  return data as EuRegulationFull;
+}

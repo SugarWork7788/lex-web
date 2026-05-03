@@ -45,6 +45,12 @@ export default function RootLayout({
               <Link href="/laws" className="hover:underline underline-offset-4">
                 Закони
               </Link>
+              <Link href="/courts" className="hover:underline underline-offset-4">
+                Съдебна практика
+              </Link>
+              <Link href="/eu" className="hover:underline underline-offset-4">
+                ЕС право
+              </Link>
               <Link
                 href="/laws"
                 className="hover:underline underline-offset-4"
