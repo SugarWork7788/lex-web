@@ -449,6 +449,29 @@ export async function getEuRegulation(
   return data as EuRegulationFull;
 }
 
+export async function searchEuRegulations(
+  query: string,
+  limit = 20,
+): Promise<EuRegulation[]> {
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+  // Escape commas/percents that would break PostgREST's `or` syntax.
+  const safe = trimmed.replace(/[%,()]/g, " ");
+  const { data, error } = await supabase
+    .from("eu_regulations")
+    .select(
+      "id,celex,title_bg,title_en,doc_type,year,number,in_force,date_document,date_force,source_url",
+    )
+    .or(`title_bg.ilike.%${safe}%,title_en.ilike.%${safe}%,celex.ilike.%${safe}%`)
+    .order("date_document", { ascending: false, nullsFirst: false })
+    .limit(limit);
+  if (error) {
+    console.error("searchEuRegulations error", error);
+    return [];
+  }
+  return (data ?? []) as EuRegulation[];
+}
+
 export async function getDecisionsForLaw(
   lawSlug: string,
   limit = 6,
