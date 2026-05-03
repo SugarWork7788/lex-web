@@ -26,6 +26,14 @@ export type Pass2Stats = {
   laws_touched: number;
 };
 
+export type SearchProgress = {
+  searched_terms: number;
+  queries_done: number;
+  articles_found: number;
+  laws_loaded: number;
+  laws_total_to_load: number;
+};
+
 export async function loadFullLaw(slug: string): Promise<AnalysisLaw | null> {
   const law = await getLawBySlug(slug);
   if (!law) return null;
@@ -47,6 +55,10 @@ export function formatLawForPrompt(law: AnalysisLaw): string {
 
 export function estimateTokens(text: string): number {
   return Math.round(text.length / 2.2);
+}
+
+function articleTokenCost(a: LawArticle): number {
+  return estimateTokens(`Чл.${a.article_number}: ${a.text_content}\n\n`);
 }
 
 // =====================================================================
@@ -88,7 +100,6 @@ export async function extractConcepts(target: AnalysisLaw): Promise<Concepts> {
   const textBlock = response.content.find((b) => b.type === "text");
   const text = textBlock && textBlock.type === "text" ? textBlock.text : "";
 
-  // Strip any accidental markdown fencing.
   const cleaned = text
     .replace(/^```(?:json)?\s*/i, "")
     .replace(/```\s*$/i, "")
@@ -98,7 +109,6 @@ export async function extractConcepts(target: AnalysisLaw): Promise<Concepts> {
   try {
     parsed = JSON.parse(cleaned);
   } catch {
-    // Fallback: derive crude terms from chapter titles + first articles.
     const titles = new Set<string>();
     for (const a of target.articles.slice(0, 30)) {
       if (a.chapter_title) titles.add(a.chapter_title);
@@ -133,23 +143,31 @@ export async function extractConcepts(target: AnalysisLaw): Promise<Concepts> {
 // PASS 2 — Search the entire corpus for related articles
 // =====================================================================
 
-type ArticleRef = { law_slug: string; article_number: string };
-type RankedRef = ArticleRef & { rank: number; law_name_bg: string; category: string };
+type RankedRef = {
+  law_slug: string;
+  article_number: string;
+  rank: number;
+  law_name_bg: string;
+  category: string;
+};
 
 export async function searchRelevantLaws(
   concepts: Concepts,
   excludeSlugs: Set<string>,
   opts: {
     perTermLimit?: number;
-    maxArticlesTotal?: number;
     maxLawsTotal?: number;
+    maxArticlesPerLaw?: number;
+    availableTokenBudget?: number;
+    onProgress?: (p: SearchProgress) => void;
   } = {},
 ): Promise<{ laws: AnalysisLaw[]; stats: Pass2Stats }> {
   const perTermLimit = opts.perTermLimit ?? 8;
-  const maxArticlesTotal = opts.maxArticlesTotal ?? 150;
   const maxLawsTotal = opts.maxLawsTotal ?? 30;
+  const maxArticlesPerLaw = opts.maxArticlesPerLaw ?? 25;
+  const availableTokenBudget = opts.availableTokenBudget ?? 80_000;
+  const onProgress = opts.onProgress;
 
-  // Choose search terms: prioritize terms + entities (most discriminative).
   const queries = uniqueStrings([
     ...concepts.terms,
     ...concepts.entities,
@@ -157,11 +175,25 @@ export async function searchRelevantLaws(
     ...concepts.rights.slice(0, 4),
   ]).slice(0, 18);
 
-  // Run FTS in parallel.
+  const progress: SearchProgress = {
+    searched_terms: queries.length,
+    queries_done: 0,
+    articles_found: 0,
+    laws_loaded: 0,
+    laws_total_to_load: 0,
+  };
+
+  // Pass 2a: parallel FTS, with progress emission per resolved query.
   const allHits = await Promise.all(
-    queries.map((q) =>
-      searchArticles(q, perTermLimit).catch(() => [] as Awaited<ReturnType<typeof searchArticles>>),
-    ),
+    queries.map(async (q) => {
+      const hits = await searchArticles(q, perTermLimit).catch(
+        () => [] as Awaited<ReturnType<typeof searchArticles>>,
+      );
+      progress.queries_done++;
+      progress.articles_found += hits.length;
+      onProgress?.({ ...progress });
+      return hits;
+    }),
   );
 
   // Dedup by (law_slug, article_number), keep best rank.
@@ -185,22 +217,24 @@ export async function searchRelevantLaws(
     }
   }
 
-  // Sort all unique articles by rank desc, take top N overall.
   const ranked = [...seen.values()].sort((a, b) => b.rank - a.rank);
 
-  // Apply caps: maxArticlesTotal globally, maxLawsTotal distinct laws.
+  // Apply law-count + per-law caps so a single chatty law can't monopolize.
+  const perLawCount = new Map<string, number>();
   const lawsAccepted = new Set<string>();
   const acceptedRefs: RankedRef[] = [];
   for (const r of ranked) {
-    if (acceptedRefs.length >= maxArticlesTotal) break;
     if (!lawsAccepted.has(r.law_slug)) {
       if (lawsAccepted.size >= maxLawsTotal) continue;
       lawsAccepted.add(r.law_slug);
     }
+    const cnt = perLawCount.get(r.law_slug) ?? 0;
+    if (cnt >= maxArticlesPerLaw) continue;
+    perLawCount.set(r.law_slug, cnt + 1);
     acceptedRefs.push(r);
   }
 
-  // Group by law_slug, fetch the matched articles in one batch per law.
+  // Group accepted refs by law_slug.
   const byLaw = new Map<string, RankedRef[]>();
   for (const r of acceptedRefs) {
     const arr = byLaw.get(r.law_slug) ?? [];
@@ -208,39 +242,102 @@ export async function searchRelevantLaws(
     byLaw.set(r.law_slug, arr);
   }
 
-  const laws: AnalysisLaw[] = await Promise.all(
-    [...byLaw.entries()].map(async ([slug, refs]) => {
-      const articleNumbers = refs.map((r) => r.article_number);
-      const { data, error } = await supabase
-        .from("law_articles")
-        .select(
-          "law_slug, ordinal, chapter_title, section_title, article_number, text_content",
-        )
-        .eq("law_slug", slug)
-        .in("article_number", articleNumbers)
-        .order("ordinal", { ascending: true });
-      if (error) {
-        console.warn(`[analyze] failed to load articles for ${slug}: ${error.message}`);
-        return null;
-      }
-      const articles = (data ?? []) as LawArticle[];
-      if (articles.length === 0) return null;
+  progress.laws_total_to_load = byLaw.size;
+  onProgress?.({ ...progress });
+
+  // Pass 2b: parallel article-body fetches.
+  const lawsLoaded: { law: AnalysisLaw; ranks: Map<string, number> }[] = (
+    await Promise.all(
+      [...byLaw.entries()].map(async ([slug, refs]) => {
+        const articleNumbers = refs.map((r) => r.article_number);
+        const { data, error } = await supabase
+          .from("law_articles")
+          .select(
+            "law_slug, ordinal, chapter_title, section_title, article_number, text_content",
+          )
+          .eq("law_slug", slug)
+          .in("article_number", articleNumbers)
+          .order("ordinal", { ascending: true });
+        if (error) {
+          console.warn(
+            `[analyze] failed to load articles for ${slug}: ${error.message}`,
+          );
+          progress.laws_loaded++;
+          onProgress?.({ ...progress });
+          return null;
+        }
+        const articles = (data ?? []) as LawArticle[];
+        progress.laws_loaded++;
+        onProgress?.({ ...progress });
+        if (articles.length === 0) return null;
+        const ranks = new Map<string, number>();
+        for (const r of refs) ranks.set(r.article_number, r.rank);
+        return {
+          law: {
+            slug,
+            name_bg: refs[0].law_name_bg,
+            category: refs[0].category,
+            articles,
+          },
+          ranks,
+        };
+      }),
+    )
+  ).filter((x): x is { law: AnalysisLaw; ranks: Map<string, number> } => x !== null);
+
+  // Token-budget walk: flatten + sort by rank, accept until budget exhausted.
+  type FlatItem = {
+    lawSlug: string;
+    article: LawArticle;
+    rank: number;
+  };
+  const flat: FlatItem[] = [];
+  for (const { law, ranks } of lawsLoaded) {
+    for (const a of law.articles) {
+      flat.push({
+        lawSlug: law.slug,
+        article: a,
+        rank: ranks.get(a.article_number) ?? 0,
+      });
+    }
+  }
+  flat.sort((a, b) => b.rank - a.rank);
+
+  const acceptedByLaw = new Map<string, LawArticle[]>();
+  let usedTokens = 0;
+  let acceptedCount = 0;
+  for (const item of flat) {
+    const cost = articleTokenCost(item.article);
+    if (usedTokens + cost > availableTokenBudget) break;
+    usedTokens += cost;
+    acceptedCount++;
+    const arr = acceptedByLaw.get(item.lawSlug) ?? [];
+    arr.push(item.article);
+    acceptedByLaw.set(item.lawSlug, arr);
+  }
+
+  // Re-sort accepted articles within each law by ordinal for readability.
+  const finalLaws: AnalysisLaw[] = lawsLoaded
+    .map(({ law }) => {
+      const accepted = acceptedByLaw.get(law.slug);
+      if (!accepted || accepted.length === 0) return null;
+      const sorted = [...accepted].sort((a, b) => a.ordinal - b.ordinal);
       return {
-        slug,
-        name_bg: refs[0].law_name_bg,
-        category: refs[0].category,
-        articles,
+        slug: law.slug,
+        name_bg: law.name_bg,
+        category: law.category,
+        articles: sorted,
       };
-    }),
-  ).then((arr) => arr.filter((l): l is AnalysisLaw => l !== null));
+    })
+    .filter((l): l is AnalysisLaw => l !== null);
 
   return {
-    laws,
+    laws: finalLaws,
     stats: {
       searched_terms: queries.length,
       raw_hits: rawCount,
-      unique_articles: acceptedRefs.length,
-      laws_touched: laws.length,
+      unique_articles: acceptedCount,
+      laws_touched: finalLaws.length,
     },
   };
 }

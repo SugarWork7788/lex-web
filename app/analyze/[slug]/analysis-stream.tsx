@@ -46,7 +46,51 @@ type SearchStats = {
   laws_touched?: number;
 };
 
+type SearchProgress = {
+  searched_terms?: number;
+  queries_done?: number;
+  articles_found?: number;
+  laws_loaded?: number;
+  laws_total_to_load?: number;
+};
+
 type Status = "idle" | "streaming" | "done" | "error";
+
+const PHASE_DURATIONS_S: Record<string, number> = {
+  concepts: 15,
+  search: 10,
+  analyze: 75,
+  deep_dive: 30,
+};
+
+function estimateRemainingSeconds(
+  phaseName: string | null,
+  cached: boolean,
+): number {
+  const order = cached
+    ? ["analyze", "deep_dive"]
+    : ["concepts", "search", "analyze", "deep_dive"];
+  if (!phaseName) {
+    return order.reduce((s, p) => s + PHASE_DURATIONS_S[p], 0);
+  }
+  const base = phaseName
+    .replace(/_done$/, "")
+    .replace(/_progress$/, "")
+    .replace(/^cache_hit$/, "analyze");
+  const idx = order.indexOf(base);
+  if (idx < 0) return 0;
+  const phaseSliceFromCurrent = order
+    .slice(idx)
+    .reduce((s, p) => s + PHASE_DURATIONS_S[p], 0);
+  return phaseSliceFromCurrent;
+}
+
+function formatMMSS(totalSeconds: number): string {
+  const s = Math.max(0, Math.floor(totalSeconds));
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${m}:${sec.toString().padStart(2, "0")}`;
+}
 
 const SEVERITY_ORDER: Record<Severity, number> = {
   висок: 0,
@@ -179,9 +223,16 @@ export function AnalysisStream({
     [targetSlug]: targetName,
   });
   const [searchStats, setSearchStats] = useState<SearchStats | null>(null);
+  const [searchProgress, setSearchProgress] = useState<SearchProgress | null>(
+    null,
+  );
+  const [usedCache, setUsedCache] = useState(false);
+  const [cacheAgeMin, setCacheAgeMin] = useState<number | null>(null);
+  const [elapsedMs, setElapsedMs] = useState(0);
   const [filter, setFilter] = useState<IssueType | null>(null);
   const [retryToken, setRetryToken] = useState(0);
   const startedRef = useRef(false);
+  const startedAtRef = useRef<number | null>(null);
   const searchParams = useSearchParams();
   const targetIssueParam = searchParams.get("issue");
 
@@ -201,7 +252,12 @@ export function AnalysisStream({
     setStatus("streaming");
     setPhase(null);
     setSearchStats(null);
+    setSearchProgress(null);
+    setUsedCache(false);
+    setCacheAgeMin(null);
+    setElapsedMs(0);
     setLawsMap({ [targetSlug]: targetName });
+    startedAtRef.current = Date.now();
 
     (async () => {
       try {
@@ -233,6 +289,18 @@ export function AnalysisStream({
             const name = String(ev.phase ?? "");
             const message = String(ev.message ?? "");
             setPhase({ name, message });
+            if (name === "cache_hit") {
+              setUsedCache(true);
+              const age = (ev.data as { age_minutes?: number } | undefined)
+                ?.age_minutes;
+              if (typeof age === "number") setCacheAgeMin(age);
+            }
+            if (name === "search_progress") {
+              const data = ev.data;
+              if (data && typeof data === "object") {
+                setSearchProgress(data as SearchProgress);
+              }
+            }
           } else if (type === "laws_map") {
             const map = ev.laws_map;
             if (map && typeof map === "object") {
@@ -241,6 +309,7 @@ export function AnalysisStream({
             if (ev.stats && typeof ev.stats === "object") {
               setSearchStats(ev.stats as SearchStats);
             }
+            if (ev.cached === true) setUsedCache(true);
           } else if (type === "issue") {
             const issue = normalizeIssueFromEvent(ev);
             if (issue) setIssues((prev) => [...prev, issue]);
@@ -305,6 +374,17 @@ export function AnalysisStream({
     return () => controller.abort();
   }, [targetSlug, targetName, retryToken]);
 
+  // Live elapsed timer (1 Hz) while streaming.
+  useEffect(() => {
+    if (status !== "streaming") return;
+    const id = setInterval(() => {
+      if (startedAtRef.current != null) {
+        setElapsedMs(Date.now() - startedAtRef.current);
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, [status]);
+
   // Sort + filter for display.
   const grouped = useMemo(() => {
     const filtered = filter ? issues.filter((i) => i.type === filter) : issues;
@@ -353,11 +433,35 @@ export function AnalysisStream({
 
   const totalAnalyzedLaws = Object.keys(lawsMap).length;
   const showPhaseStrip = status === "streaming" && phase !== null;
+  const elapsedS = Math.floor(elapsedMs / 1000);
+  const remainingEstimate = estimateRemainingSeconds(
+    phase?.name ?? null,
+    usedCache,
+  );
 
   return (
     <section className="mt-6 print-area">
+      {usedCache && (
+        <div className="mb-3 inline-flex items-center gap-2 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs text-emerald-900 dark:border-emerald-800/60 dark:bg-emerald-950/30 dark:text-emerald-200 print:hidden">
+          <span aria-hidden>⚡</span>
+          Използвам кеширани резултати от по-ранен анализ
+          {cacheAgeMin != null && (
+            <span className="opacity-70">
+              · преди {cacheAgeMin} {cacheAgeMin === 1 ? "минута" : "минути"}
+            </span>
+          )}
+        </div>
+      )}
+
       {showPhaseStrip && (
-        <PhaseStrip phase={phase!} stats={searchStats} status={status} />
+        <PhaseStrip
+          phase={phase!}
+          stats={searchStats}
+          status={status}
+          elapsedS={elapsedS}
+          remainingEstimateS={remainingEstimate}
+          searchProgress={searchProgress}
+        />
       )}
 
       {totalAnalyzedLaws > 1 && (
@@ -454,21 +558,27 @@ function PhaseStrip({
   phase,
   stats,
   status,
+  elapsedS,
+  remainingEstimateS,
+  searchProgress,
 }: {
   phase: Phase;
   stats: SearchStats | null;
   status: Status;
+  elapsedS: number;
+  remainingEstimateS: number;
+  searchProgress: SearchProgress | null;
 }) {
   const label = PHASE_LABELS[phase.name] ?? phase.message;
   const isActive = !phase.name.endsWith("_done") && status === "streaming";
+  const showLiveLawCount =
+    phase.name === "search" || phase.name === "search_progress";
   return (
     <div className="rounded-lg border border-amber-300 bg-amber-50/60 px-4 py-2.5 text-sm dark:border-amber-700/60 dark:bg-amber-950/30 print:hidden">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <span
           className={`inline-block h-2 w-2 rounded-full ${
-            isActive
-              ? "bg-amber-500 animate-pulse"
-              : "bg-emerald-500"
+            isActive ? "bg-amber-500 animate-pulse" : "bg-emerald-500"
           }`}
           aria-hidden
         />
@@ -478,12 +588,30 @@ function PhaseStrip({
         <span className="text-amber-800/80 dark:text-amber-200/80">
           {phase.message}
         </span>
+        {showLiveLawCount &&
+          searchProgress &&
+          (searchProgress.laws_loaded ?? 0) > 0 && (
+            <span className="rounded-full bg-amber-200/70 px-2 py-0.5 text-[11px] font-medium text-amber-900 dark:bg-amber-800/60 dark:text-amber-100">
+              {searchProgress.laws_loaded} закона вече заредени
+            </span>
+          )}
         {stats && phase.name === "search_done" && (
-          <span className="ml-auto text-xs text-amber-800/70 dark:text-amber-200/70">
+          <span className="text-xs text-amber-800/70 dark:text-amber-200/70">
             {stats.searched_terms} термина · {stats.unique_articles} статии ·{" "}
             {stats.laws_touched} закона
           </span>
         )}
+        <span className="ml-auto inline-flex items-center gap-3 text-xs tabular-nums text-amber-900/80 dark:text-amber-100/80">
+          <span title="Изминало време">⏱ {formatMMSS(elapsedS)}</span>
+          {remainingEstimateS > 0 && (
+            <span
+              className="opacity-75"
+              title="Очаквано оставащо време (приблизително)"
+            >
+              ~{formatMMSS(Math.max(0, remainingEstimateS - 0))} оставащи
+            </span>
+          )}
+        </span>
       </div>
     </div>
   );

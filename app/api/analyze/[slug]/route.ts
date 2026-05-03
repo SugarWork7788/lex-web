@@ -7,10 +7,48 @@ import {
   formatLawForPrompt,
   estimateTokens,
   type AnalysisLaw,
+  type Pass2Stats,
+  type SearchProgress,
 } from "@/lib/analyze-context";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
+
+// ---- Module-level cache (per warm Lambda instance) ----
+type CachedCorpus = {
+  constitution: AnalysisLaw | null;
+  relatedLaws: AnalysisLaw[];
+  lawsMap: Record<string, string>;
+  stats: Pass2Stats;
+  timestamp: number;
+};
+
+const CORPUS_CACHE = new Map<string, CachedCorpus>();
+const CACHE_TTL_MS = 60 * 60 * 1000;
+const CACHE_MAX_ENTRIES = 50;
+
+function cacheGet(slug: string): CachedCorpus | null {
+  const entry = CORPUS_CACHE.get(slug);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
+    CORPUS_CACHE.delete(slug);
+    return null;
+  }
+  // LRU touch.
+  CORPUS_CACHE.delete(slug);
+  CORPUS_CACHE.set(slug, entry);
+  return entry;
+}
+
+function cachePut(slug: string, entry: CachedCorpus) {
+  if (CORPUS_CACHE.size >= CACHE_MAX_ENTRIES) {
+    const firstKey = CORPUS_CACHE.keys().next().value;
+    if (firstKey) CORPUS_CACHE.delete(firstKey);
+  }
+  CORPUS_CACHE.set(slug, entry);
+}
+
+// ---- Prompts ----
 
 const PASS3_SYSTEM = `Ти си правен анализатор на българското законодателство.
 Получаваш основен закон, Конституцията на Република България, и подбран набор от
@@ -59,13 +97,17 @@ const PASS4_SYSTEM = `Ти си правен анализатор. Получа�
 - "verified": true ако проблемът е реален при пълен контекст; false ако всъщност няма противоречие.
 - "refined_explanation": Конкретно, точно обяснение. Цитирай номера на членове, ако е уместно.`;
 
+// ---- Stream event types ----
+
 type StreamEvent =
   | { event: "phase"; phase: string; message: string; data?: unknown }
-  | { event: "laws_map"; laws_map: Record<string, string>; stats: unknown }
+  | { event: "laws_map"; laws_map: Record<string, string>; stats: unknown; cached?: boolean }
   | { event: "issue"; id: string; [k: string]: unknown }
   | { event: "issue_update"; id: string; [k: string]: unknown }
   | { event: "done"; total: number }
   | { event: "fatal"; message: string };
+
+// ---- Prompt builders ----
 
 function buildPass3UserMessage(
   target: AnalysisLaw,
@@ -119,6 +161,10 @@ function buildPass4UserMessage(
   ].join("\n");
 }
 
+// =====================================================================
+// Route handler
+// =====================================================================
+
 export async function POST(
   _req: Request,
   ctx: { params: Promise<{ slug: string }> },
@@ -131,7 +177,6 @@ export async function POST(
       const emit = (e: StreamEvent) => {
         controller.enqueue(encoder.encode(JSON.stringify(e) + "\n"));
       };
-
       const failFatal = (msg: string) => {
         emit({ event: "fatal", message: msg });
         controller.close();
@@ -145,56 +190,146 @@ export async function POST(
           return;
         }
 
-        // ---- PASS 1: extract concepts ----
-        emit({
-          event: "phase",
-          phase: "concepts",
-          message: "Извличам ключови концепции от закона…",
-        });
-        const concepts = await extractConcepts(target);
-        emit({
-          event: "phase",
-          phase: "concepts_done",
-          message: `Намерих ${concepts.terms.length} ключови термина`,
-          data: {
-            terms: concepts.terms.length,
-            entities: concepts.entities.length,
-          },
-        });
+        // ---- Cache check ----
+        const cached = cacheGet(slug);
+        let constitution: AnalysisLaw | null = null;
+        let relatedLaws: AnalysisLaw[] = [];
+        let stats: Pass2Stats;
+        let usedCache = false;
 
-        // ---- PASS 2: FTS across the entire corpus ----
-        emit({
-          event: "phase",
-          phase: "search",
-          message: "Търся в 1240 закона по ключовите концепции…",
-        });
+        if (cached) {
+          usedCache = true;
+          const ageMin = Math.round((Date.now() - cached.timestamp) / 60000);
+          emit({
+            event: "phase",
+            phase: "cache_hit",
+            message: "Използвам кеширани резултати от по-ранен анализ",
+            data: { age_minutes: ageMin },
+          });
+          constitution = cached.constitution;
+          relatedLaws = cached.relatedLaws;
+          stats = cached.stats;
+          emit({
+            event: "laws_map",
+            laws_map: cached.lawsMap,
+            stats,
+            cached: true,
+          });
+        } else {
+          // ---- PARALLEL: Pass 1 (concepts) + constitution load ----
+          emit({
+            event: "phase",
+            phase: "concepts",
+            message: "Извличам ключови концепции и зареждам Конституцията…",
+          });
 
-        const exclude = new Set<string>([target.slug, CONSTITUTION_SLUG]);
-        const { laws: relatedLaws, stats } = await searchRelevantLaws(
-          concepts,
-          exclude,
-        );
+          const wantConstitution = target.slug !== CONSTITUTION_SLUG;
+          const constitutionPromise: Promise<AnalysisLaw | null> = wantConstitution
+            ? loadFullLaw(CONSTITUTION_SLUG)
+            : Promise.resolve(null);
 
-        // Always include constitution (full).
-        const constitution =
-          target.slug === CONSTITUTION_SLUG
-            ? null
-            : await loadFullLaw(CONSTITUTION_SLUG);
+          const [concepts, constitutionResolved] = await Promise.all([
+            extractConcepts(target),
+            constitutionPromise,
+          ]);
+          constitution = constitutionResolved;
 
-        emit({
-          event: "phase",
-          phase: "search_done",
-          message: `Намерих ${stats.unique_articles} релевантни статии в ${stats.laws_touched} закона`,
-          data: stats,
-        });
+          emit({
+            event: "phase",
+            phase: "concepts_done",
+            message: `Намерих ${concepts.terms.length} ключови термина`,
+            data: {
+              terms: concepts.terms.length,
+              entities: concepts.entities.length,
+            },
+          });
 
-        // Build laws_map and emit so the UI can render pills.
-        const lawsMap: Record<string, string> = {
-          [target.slug]: target.name_bg,
-        };
-        if (constitution) lawsMap[constitution.slug] = constitution.name_bg;
-        for (const l of relatedLaws) lawsMap[l.slug] = l.name_bg;
-        emit({ event: "laws_map", laws_map: lawsMap, stats });
+          // ---- PASS 2: corpus FTS + token-budgeted selection ----
+          const targetTokens = estimateTokens(formatLawForPrompt(target));
+          const constitutionTokens = constitution
+            ? estimateTokens(formatLawForPrompt(constitution))
+            : 0;
+          const MAX_INPUT_BUDGET = 180_000;
+          const SYSTEM_OVERHEAD = 3_000;
+          const availableTokenBudget = Math.max(
+            20_000,
+            MAX_INPUT_BUDGET - targetTokens - constitutionTokens - SYSTEM_OVERHEAD,
+          );
+
+          emit({
+            event: "phase",
+            phase: "search",
+            message: "Търся в 1240 закона по ключовите концепции…",
+            data: {
+              token_budget_for_corpus: availableTokenBudget,
+              target_tokens: targetTokens,
+              constitution_tokens: constitutionTokens,
+            },
+          });
+
+          const exclude = new Set<string>([target.slug, CONSTITUTION_SLUG]);
+
+          // Live-progress mirror, snapshotted by 3s heartbeat.
+          let liveProgress: SearchProgress = {
+            searched_terms: 0,
+            queries_done: 0,
+            articles_found: 0,
+            laws_loaded: 0,
+            laws_total_to_load: 0,
+          };
+          const heartbeat = setInterval(() => {
+            const lt = liveProgress.laws_total_to_load;
+            const ll = liveProgress.laws_loaded;
+            const message =
+              lt > 0
+                ? `Заредени ${ll} от ${lt} закона…`
+                : `Изпълних ${liveProgress.queries_done} от ${liveProgress.searched_terms} заявки…`;
+            emit({
+              event: "phase",
+              phase: "search_progress",
+              message,
+              data: { ...liveProgress },
+            });
+          }, 3000);
+
+          let searchResult;
+          try {
+            searchResult = await searchRelevantLaws(concepts, exclude, {
+              availableTokenBudget,
+              onProgress: (p) => {
+                liveProgress = p;
+              },
+            });
+          } finally {
+            clearInterval(heartbeat);
+          }
+          relatedLaws = searchResult.laws;
+          stats = searchResult.stats;
+
+          emit({
+            event: "phase",
+            phase: "search_done",
+            message: `Намерих ${stats.unique_articles} релевантни статии в ${stats.laws_touched} закона`,
+            data: stats,
+          });
+
+          // Build laws_map and emit.
+          const lawsMap: Record<string, string> = {
+            [target.slug]: target.name_bg,
+          };
+          if (constitution) lawsMap[constitution.slug] = constitution.name_bg;
+          for (const l of relatedLaws) lawsMap[l.slug] = l.name_bg;
+          emit({ event: "laws_map", laws_map: lawsMap, stats });
+
+          // Cache for next run.
+          cachePut(slug, {
+            constitution,
+            relatedLaws,
+            lawsMap,
+            stats,
+            timestamp: Date.now(),
+          });
+        }
 
         // ---- PASS 3: deep conflict analysis (streaming) ----
         const pass3UserMessage = buildPass3UserMessage(
@@ -204,7 +339,7 @@ export async function POST(
         );
         const pass3Tokens = estimateTokens(pass3UserMessage);
         console.log(
-          `[analyze:${slug}] pass3: target=${target.articles.length}art constitution=${constitution?.articles.length ?? 0}art related=${relatedLaws.length}laws/${stats.unique_articles}art ~tokens=${pass3Tokens}`,
+          `[analyze:${slug}] pass3: target=${target.articles.length}art constitution=${constitution?.articles.length ?? 0}art related=${relatedLaws.length}laws/${stats.unique_articles}art ~tokens=${pass3Tokens} cached=${usedCache}`,
         );
 
         emit({
@@ -216,6 +351,13 @@ export async function POST(
         const client = new Anthropic();
         const issues: Array<Record<string, unknown> & { id: string }> = [];
 
+        // Speculative loads for Pass 4: kicked off during Pass 3 streaming.
+        const speculativeLoads = new Map<
+          string,
+          Promise<AnalysisLaw | null>
+        >();
+        const SPECULATIVE_CAP = 8;
+
         const claudeStream = client.messages.stream({
           model: "claude-sonnet-4-6",
           max_tokens: 16000,
@@ -225,6 +367,30 @@ export async function POST(
 
         let buffer = "";
         let counter = 0;
+
+        const handleParsedIssue = (parsed: Record<string, unknown>) => {
+          const id = `i${counter++}`;
+          const issue: Record<string, unknown> & { id: string } = {
+            ...parsed,
+            id,
+          };
+          issues.push(issue);
+          emit({ event: "issue", ...issue });
+
+          // Speculatively start loading the conflicting law for висок issues
+          // so its full text is in memory by the time Pass 4 fires.
+          const sev = parsed.severity;
+          const cls = parsed.conflicting_law_slug;
+          if (
+            sev === "висок" &&
+            typeof cls === "string" &&
+            cls &&
+            !speculativeLoads.has(cls) &&
+            speculativeLoads.size < SPECULATIVE_CAP
+          ) {
+            speculativeLoads.set(cls, loadFullLaw(cls));
+          }
+        };
 
         claudeStream.on("text", (delta) => {
           buffer += delta;
@@ -236,12 +402,9 @@ export async function POST(
             try {
               const parsed = JSON.parse(line);
               if (typeof parsed !== "object" || parsed === null) continue;
-              const id = `i${counter++}`;
-              const issue = { ...parsed, id };
-              issues.push(issue);
-              emit({ event: "issue", ...issue });
+              handleParsedIssue(parsed as Record<string, unknown>);
             } catch {
-              // incomplete — wait
+              // incomplete line — wait for more bytes
             }
           }
         });
@@ -254,10 +417,7 @@ export async function POST(
           try {
             const parsed = JSON.parse(tail);
             if (typeof parsed === "object" && parsed !== null) {
-              const id = `i${counter++}`;
-              const issue = { ...parsed, id };
-              issues.push(issue);
-              emit({ event: "issue", ...issue });
+              handleParsedIssue(parsed as Record<string, unknown>);
             }
           } catch {
             // ignore
@@ -271,14 +431,16 @@ export async function POST(
           data: { total: issues.length },
         });
 
-        // ---- PASS 4: deep-dive on top висок issues ----
+        // ---- PASS 4: deep-dive on top висок issues, in parallel ----
         const highIssues = issues
-          .filter(
-            (i) =>
-              i.severity === "висок" &&
-              typeof i.conflicting_law_slug === "string" &&
-              i.conflicting_law_slug,
-          )
+          .filter((i) => {
+            const r = i as Record<string, unknown>;
+            return (
+              r.severity === "висок" &&
+              typeof r.conflicting_law_slug === "string" &&
+              r.conflicting_law_slug
+            );
+          })
           .slice(0, 3);
 
         if (highIssues.length > 0) {
@@ -298,7 +460,10 @@ export async function POST(
                   id: issue.id,
                   status: "verifying",
                 });
-                const conflicting = await loadFullLaw(conflictingSlug);
+                // Reuse the speculative load if it was started during Pass 3.
+                const conflicting = await (speculativeLoads.get(
+                  conflictingSlug,
+                ) ?? loadFullLaw(conflictingSlug));
                 if (!conflicting) {
                   emit({
                     event: "issue_update",
