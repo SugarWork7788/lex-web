@@ -18,6 +18,40 @@ const SEV_CARD: Record<string, string> = {
   "СЕРИОЗНО": "border-orange-700/40 bg-orange-950/15",
   "УМЕРЕНО":  "border-yellow-700/30 bg-yellow-950/10",
 };
+const SEV_DOT: Record<string, string> = {
+  "КРИТИЧНО": "bg-red-500",
+  "СЕРИОЗНО": "bg-orange-500",
+  "УМЕРЕНО":  "bg-yellow-400",
+};
+
+type TimelineBucketId = "short" | "medium" | "long" | "other";
+type TimelineBucket = { id: TimelineBucketId; label: string; sublabel: string; items: AuditFinding[] };
+
+function bucketByTimeline(findings: AuditFinding[]): TimelineBucket[] {
+  const b: Record<TimelineBucketId, AuditFinding[]> = { short: [], medium: [], long: [], other: [] };
+  for (const f of findings) {
+    const t = (f.reform_timeline ?? "").toLowerCase();
+    if (/6\s*месеца|^месец|до\s*1\s*год/.test(t)) b.short.push(f);
+    else if (/1-2|1\s*до\s*2|2-3|3\s*год/.test(t)) b.medium.push(f);
+    else if (/5\+|5\s*год|6\s*год|10\s*год/.test(t)) b.long.push(f);
+    else b.other.push(f);
+  }
+  const out: TimelineBucket[] = [
+    { id: "short",  label: "Краткосрочно", sublabel: "≤ 6 месеца",  items: b.short  },
+    { id: "medium", label: "Средносрочно", sublabel: "1–2 години",  items: b.medium },
+    { id: "long",   label: "Дългосрочно",  sublabel: "5+ години",   items: b.long   },
+  ];
+  if (b.other.length) out.push({ id: "other", label: "Без срок", sublabel: "не е дефинирано", items: b.other });
+  return out;
+}
+
+function countSeverity(items: AuditFinding[]) {
+  return {
+    КРИТИЧНО: items.filter((f) => f.severity === "КРИТИЧНО").length,
+    СЕРИОЗНО: items.filter((f) => f.severity === "СЕРИОЗНО").length,
+    УМЕРЕНО:  items.filter((f) => f.severity === "УМЕРЕНО").length,
+  };
+}
 
 type Props = { searchParams: Promise<{ domain?: string; severity?: string }> };
 
@@ -27,7 +61,9 @@ export default async function AuditPage({ searchParams }: Props) {
     getAuditFindings(sp.domain, sp.severity),
     getAuditStats(),
   ]);
-  const allDomains = [...new Set((await getAuditFindings()).map((f) => f.domain))];
+  const allFindings = await getAuditFindings();
+  const allDomains = [...new Set(allFindings.map((f) => f.domain))];
+  const timelineBuckets = bucketByTimeline(allFindings);
 
   // group by domain in stable domain_order
   const groups = new Map<string, AuditFinding[]>();
@@ -59,6 +95,8 @@ export default async function AuditPage({ searchParams }: Props) {
           <Stat n={stats.domains}  label="домейни" tone="stone" />
           <Stat n={stats.total}    label="общо находки" tone="stone" />
         </ul>
+
+        <TimelineRoadmap buckets={timelineBuckets} />
 
         {/* Domain filter */}
         <div className="mt-6 flex flex-wrap gap-2 print:hidden">
@@ -115,6 +153,60 @@ export default async function AuditPage({ searchParams }: Props) {
         )}
       </div>
     </div>
+  );
+}
+
+function TimelineRoadmap({ buckets }: { buckets: TimelineBucket[] }) {
+  return (
+    <section className="mt-7 rounded-xl border border-stone-800 bg-stone-900/40 p-5 sm:p-6 print:break-after-page print:mt-4 print:border-stone-300 print:bg-transparent">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <h2 className="font-serif text-lg font-semibold">График на реформите</h2>
+        <span className="text-[11px] uppercase tracking-wider text-stone-500">
+          всеки квадрат = 1 находка · кликнете за детайли
+        </span>
+      </div>
+      <div className="mt-5 space-y-5">
+        {buckets.map((b) => {
+          const c = countSeverity(b.items);
+          return (
+            <div key={b.id}>
+              <div className="flex items-baseline gap-2">
+                <span className="font-serif text-base font-semibold">{b.label}</span>
+                <span className="text-xs text-stone-500">{b.sublabel}</span>
+                <span className="ml-auto text-sm font-semibold tabular-nums">
+                  {b.items.length.toLocaleString("bg-BG")}
+                </span>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1">
+                {b.items.length === 0 ? (
+                  <span className="text-xs text-stone-600">— няма реформи в този хоризонт —</span>
+                ) : (
+                  b.items
+                    .slice()
+                    .sort((a, x) => sevWeight(a.severity) - sevWeight(x.severity))
+                    .map((f) => (
+                      <Link
+                        key={f.id}
+                        href={`/audit/finding/${f.id}`}
+                        title={`${f.title} — ${f.severity}`}
+                        aria-label={f.title}
+                        className={`block h-2.5 w-2.5 rounded-[2px] transition-transform hover:scale-150 ${SEV_DOT[f.severity]}`}
+                      />
+                    ))
+                )}
+              </div>
+              {b.items.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-stone-500">
+                  <span><span className="font-semibold text-red-400">{c.КРИТИЧНО}</span> критични</span>
+                  <span><span className="font-semibold text-orange-400">{c.СЕРИОЗНО}</span> сериозни</span>
+                  <span><span className="font-semibold text-yellow-400">{c.УМЕРЕНО}</span> умерени</span>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
