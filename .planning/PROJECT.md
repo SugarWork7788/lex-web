@@ -47,10 +47,10 @@ Every Bulgarian citizen can read, understand, and act on the law that affects th
 ### Out of Scope
 
 - Native mobile app — web-first; reader works on mobile, app would 5x scope — defer indefinitely
-- User accounts / login — anonymous reader app; only optional email opt-in for alerts — keeps friction zero
+- ~~User accounts / login~~ — **Reversed 2026-05-05**: promoted to v2.3 milestone (Auth & Premium hooks). Anonymous reading on `/laws` and `/audit` content is preserved; only voting + `/intel` + future premium features become gated.
 - Comments / discussion threads on laws — moderation cost dwarfs reader value; alerts cover the "tell me when X changes" use case
 - Editorial CMS — laws come from scrapers (lex-brain), not human-authored content
-- Paid tier / subscriptions — non-commercial public service
+- Paid tier / subscriptions — non-commercial public service. **v2.3 ships only the gating *hooks*** (`tier` enum + `useUserTier()`); actual billing (Stripe etc.) is a separate future milestone.
 - Languages other than Bulgarian — corpus is BG; translation is a separate product
 
 ## Context
