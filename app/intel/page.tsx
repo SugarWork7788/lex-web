@@ -41,7 +41,23 @@ export default async function IntelPage() {
           </p>
         </header>
 
-        <ul className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <Link
+          href="/intel/search"
+          className="mt-8 group flex items-center gap-4 rounded-lg border border-red-700/60 bg-gradient-to-r from-red-950/40 to-stone-900/60 p-5 hover:border-red-500 transition"
+        >
+          <span className="text-3xl">✦</span>
+          <div className="flex-1">
+            <div className="font-serif text-lg font-semibold">Търси в Intel</div>
+            <p className="mt-0.5 text-xs text-stone-400">
+              Едновременно търсене във всички 6 бази + AI обобщение на намереното
+            </p>
+          </div>
+          <span className="rounded-md bg-red-700 px-3 py-1.5 text-xs font-medium text-white group-hover:bg-red-600">
+            Отвори →
+          </span>
+        </Link>
+
+        <ul className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {stats.map((s) => (
             <li key={s.href}>
               <Link
