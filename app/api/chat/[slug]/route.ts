@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { getLawBySlug, searchArticles, searchDecisions, type CourtDecision } from "@/lib/queries";
 import { supabase, type LawArticle, type Severity } from "@/lib/supabase";
+import { rateLimited } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -247,6 +248,9 @@ export async function POST(
   req: Request,
   ctx: { params: Promise<{ slug: string }> },
 ) {
+  const limit = rateLimited(req, "chat", { windowMs: 60_000, max: 10 });
+  if (limit) return limit;
+
   const { slug } = await ctx.params;
 
   let body: RequestBody;
@@ -334,18 +338,25 @@ export async function POST(
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        const claudeStream = client.messages.stream({
-          model: "claude-sonnet-4-6",
-          max_tokens: 6000,
-          system: SYSTEM_PROMPT,
-          messages,
-        });
+        const claudeStream = client.messages.stream(
+          {
+            model: "claude-sonnet-4-6",
+            max_tokens: 6000,
+            system: SYSTEM_PROMPT,
+            messages,
+          },
+          { signal: req.signal },
+        );
         claudeStream.on("text", (delta) => {
           controller.enqueue(encoder.encode(delta));
         });
         await claudeStream.finalMessage();
         controller.close();
       } catch (err) {
+        if (req.signal.aborted) {
+          controller.close();
+          return;
+        }
         const msg = err instanceof Error ? err.message : String(err);
         controller.enqueue(encoder.encode(`\n\n[грешка: ${msg}]`));
         controller.close();

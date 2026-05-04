@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { rateLimited } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -39,6 +40,9 @@ type RequestBody = {
 };
 
 export async function POST(req: Request) {
+  const limit = rateLimited(req, "intel-search", { windowMs: 60_000, max: 10 });
+  if (limit) return limit;
+
   let body: RequestBody;
   try {
     body = (await req.json()) as RequestBody;
@@ -74,16 +78,23 @@ export async function POST(req: Request) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        const cs = client.messages.stream({
-          model: "claude-sonnet-4-6",
-          max_tokens: 1500,
-          system: SYSTEM_PROMPT,
-          messages: [{ role: "user", content: lines.join("\n") }],
-        });
+        const cs = client.messages.stream(
+          {
+            model: "claude-sonnet-4-6",
+            max_tokens: 1500,
+            system: SYSTEM_PROMPT,
+            messages: [{ role: "user", content: lines.join("\n") }],
+          },
+          { signal: req.signal },
+        );
         cs.on("text", (delta) => controller.enqueue(encoder.encode(delta)));
         await cs.finalMessage();
         controller.close();
       } catch (err) {
+        if (req.signal.aborted) {
+          controller.close();
+          return;
+        }
         const msg = err instanceof Error ? err.message : String(err);
         controller.enqueue(encoder.encode(`\n\n[грешка: ${msg}]`));
         controller.close();

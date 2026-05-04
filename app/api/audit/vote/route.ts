@@ -66,16 +66,19 @@ export async function POST(req: NextRequest) {
     return Response.json({ success: false, reason: ins.error.message }, { status: 500 });
   }
 
-  // Increment vote_count. Best-effort; don't fail the request if this fails.
-  await sb.rpc("increment_audit_vote", { fid: findingId }).then(async (r) => {
-    if (r.error) {
-      // Fallback: read+write if RPC isn't defined
-      const cur = await sb.from("audit_findings").select("vote_count").eq("id", findingId).single();
-      const next = (cur.data?.vote_count ?? 0) + 1;
-      await sb.from("audit_findings").update({ vote_count: next }).eq("id", findingId);
-    }
-  });
-
-  const after = await sb.from("audit_findings").select("vote_count").eq("id", findingId).single();
-  return Response.json({ success: true, new_count: after.data?.vote_count ?? 0 });
+  // Atomic increment via Postgres RPC. The fallback read-then-write was a
+  // TOCTOU race that lost concurrent votes; the RPC now exists in DB and
+  // returns the new vote_count directly.
+  const { data: newCount, error: rpcErr } = await sb.rpc(
+    "increment_audit_vote",
+    { fid: findingId },
+  );
+  if (rpcErr) {
+    console.error(`[vote] increment_audit_vote rpc failed: ${rpcErr.message}`);
+    return Response.json(
+      { success: false, reason: "vote_count_update_failed" },
+      { status: 500 },
+    );
+  }
+  return Response.json({ success: true, new_count: Number(newCount) || 0 });
 }

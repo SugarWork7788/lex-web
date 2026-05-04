@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { rateLimited } from "@/lib/rate-limit";
 import {
   CONSTITUTION_SLUG,
   loadFullLaw,
@@ -246,9 +247,12 @@ function buildPass4UserMessage(
 // =====================================================================
 
 export async function POST(
-  _req: Request,
+  req: Request,
   ctx: { params: Promise<{ slug: string }> },
 ) {
+  const limit = rateLimited(req, "analyze", { windowMs: 5 * 60_000, max: 3 });
+  if (limit) return limit;
+
   const { slug } = await ctx.params;
   const encoder = new TextEncoder();
   const startedAt = Date.now();
@@ -439,12 +443,15 @@ export async function POST(
         >();
         const SPECULATIVE_CAP = 8;
 
-        const claudeStream = client.messages.stream({
-          model: "claude-sonnet-4-6",
-          max_tokens: 16000,
-          system: PASS3_SYSTEM,
-          messages: [{ role: "user", content: pass3UserMessage }],
-        });
+        const claudeStream = client.messages.stream(
+          {
+            model: "claude-sonnet-4-6",
+            max_tokens: 16000,
+            system: PASS3_SYSTEM,
+            messages: [{ role: "user", content: pass3UserMessage }],
+          },
+          { signal: req.signal },
+        );
 
         let buffer = "";
         let counter = 0;
@@ -561,12 +568,15 @@ export async function POST(
                   target,
                   conflicting,
                 );
-                const response = await client.messages.create({
-                  model: "claude-sonnet-4-6",
-                  max_tokens: 1500,
-                  system: PASS4_SYSTEM,
-                  messages: [{ role: "user", content: userMessage }],
-                });
+                const response = await client.messages.create(
+                  {
+                    model: "claude-sonnet-4-6",
+                    max_tokens: 1500,
+                    system: PASS4_SYSTEM,
+                    messages: [{ role: "user", content: userMessage }],
+                  },
+                  { signal: req.signal },
+                );
                 const block = response.content.find((b) => b.type === "text");
                 const text =
                   block && block.type === "text" ? block.text.trim() : "";

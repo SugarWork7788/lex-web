@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { supabase } from "@/lib/supabase";
+import { rateLimited } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -136,6 +137,9 @@ function formatIssueContext(c: IssueContext): string {
 }
 
 export async function POST(req: Request) {
+  const limit = rateLimited(req, "issues-chat", { windowMs: 60_000, max: 10 });
+  if (limit) return limit;
+
   let body: RequestBody;
   try {
     body = (await req.json()) as RequestBody;
@@ -174,18 +178,25 @@ export async function POST(req: Request) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        const claudeStream = client.messages.stream({
-          model: "claude-sonnet-4-6",
-          max_tokens: 3000,
-          system: SYSTEM_PROMPT,
-          messages,
-        });
+        const claudeStream = client.messages.stream(
+          {
+            model: "claude-sonnet-4-6",
+            max_tokens: 3000,
+            system: SYSTEM_PROMPT,
+            messages,
+          },
+          { signal: req.signal },
+        );
         claudeStream.on("text", (delta) => {
           controller.enqueue(encoder.encode(delta));
         });
         await claudeStream.finalMessage();
         controller.close();
       } catch (err) {
+        if (req.signal.aborted) {
+          controller.close();
+          return;
+        }
         const msg = err instanceof Error ? err.message : String(err);
         controller.enqueue(encoder.encode(`\n\n[грешка: ${msg}]`));
         controller.close();

@@ -23,7 +23,9 @@ export async function POST(req: Request) {
 
   const email = (body.email ?? "").trim().toLowerCase();
   const slug = (body.slug ?? "").trim();
-  const nameBg = (body.name_bg ?? "").trim();
+  // Strip CR/LF (email-header injection) and cap length — name flows into
+  // the email subject line, which is sent raw to Resend.
+  const nameBg = (body.name_bg ?? "").trim().replace(/[\r\n]/g, "").slice(0, 100);
 
   if (!isValidEmail(email)) {
     return NextResponse.json(
@@ -74,6 +76,17 @@ export async function POST(req: Request) {
       );
     }
     token = inserted.token;
+  }
+
+  // Idempotent: don't re-send the confirmation email on repeat POSTs from
+  // the same email/law pair. Prevents inbox-spam pivot via Resend.
+  if (alreadySubscribed) {
+    return NextResponse.json({
+      ok: true,
+      alreadySubscribed: true,
+      emailSent: false,
+      emailReason: "already_subscribed",
+    });
   }
 
   const send = await sendConfirmationEmail({

@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { getEuRegulation } from "@/lib/queries";
+import { rateLimited } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -33,9 +34,12 @@ const SYSTEM_PROMPT = `Ти си експерт по правото на Евр�
 const MAX_TEXT_CHARS = 80_000;
 
 export async function POST(
-  _req: Request,
+  req: Request,
   ctx: { params: Promise<{ celex: string }> },
 ) {
+  const limit = rateLimited(req, "eu-summarize", { windowMs: 60_000, max: 10 });
+  if (limit) return limit;
+
   const { celex } = await ctx.params;
   const reg = await getEuRegulation(decodeURIComponent(celex));
   if (!reg) {
@@ -79,18 +83,25 @@ export async function POST(
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        const claudeStream = client.messages.stream({
-          model: "claude-sonnet-4-6",
-          max_tokens: 6000,
-          system: SYSTEM_PROMPT,
-          messages: [{ role: "user", content: userMessage }],
-        });
+        const claudeStream = client.messages.stream(
+          {
+            model: "claude-sonnet-4-6",
+            max_tokens: 6000,
+            system: SYSTEM_PROMPT,
+            messages: [{ role: "user", content: userMessage }],
+          },
+          { signal: req.signal },
+        );
         claudeStream.on("text", (delta) => {
           controller.enqueue(encoder.encode(delta));
         });
         await claudeStream.finalMessage();
         controller.close();
       } catch (err) {
+        if (req.signal.aborted) {
+          controller.close();
+          return;
+        }
         const msg = err instanceof Error ? err.message : String(err);
         controller.enqueue(encoder.encode(`\n\n[грешка: ${msg}]`));
         controller.close();

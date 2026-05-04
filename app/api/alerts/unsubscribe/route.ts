@@ -21,8 +21,10 @@ export async function GET(req: Request) {
       .update({ confirmed: true })
       .eq("token", token);
     if (error) {
-      return new Response(htmlPage(`Грешка: ${error.message}`), {
-        status: 500,
+      // Never reflect raw DB error into HTML — opaque message only.
+      console.error(`[unsubscribe:confirm] db error: ${error.message}`);
+      return new Response(htmlPage("Невалиден или изтекъл линк."), {
+        status: 400,
         headers: { "Content-Type": "text/html; charset=utf-8" },
       });
     }
@@ -40,8 +42,9 @@ export async function GET(req: Request) {
     .delete()
     .eq("token", token);
   if (error) {
-    return new Response(htmlPage(`Грешка: ${error.message}`), {
-      status: 500,
+    console.error(`[unsubscribe] db error: ${error.message}`);
+    return new Response(htmlPage("Невалиден или изтекъл линк."), {
+      status: 400,
       headers: { "Content-Type": "text/html; charset=utf-8" },
     });
   }

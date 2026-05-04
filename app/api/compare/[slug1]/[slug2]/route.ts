@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { loadFullLaw, formatLawForPrompt, estimateTokens } from "@/lib/analyze-context";
+import { rateLimited } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -25,9 +26,12 @@ const SYSTEM_PROMPT = `Ти си правен анализатор. Сравня
 - Пропусни тривиални или формални съвпадения.`;
 
 export async function POST(
-  _req: Request,
+  req: Request,
   ctx: { params: Promise<{ slug1: string; slug2: string }> },
 ) {
+  const limit = rateLimited(req, "compare", { windowMs: 5 * 60_000, max: 3 });
+  if (limit) return limit;
+
   const { slug1, slug2 } = await ctx.params;
   if (slug1 === slug2) {
     return new Response("Изберете два различни закона", { status: 400 });
@@ -58,12 +62,15 @@ export async function POST(
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        const claudeStream = client.messages.stream({
-          model: "claude-sonnet-4-6",
-          max_tokens: 12000,
-          system: SYSTEM_PROMPT,
-          messages: [{ role: "user", content: userMessage }],
-        });
+        const claudeStream = client.messages.stream(
+          {
+            model: "claude-sonnet-4-6",
+            max_tokens: 12000,
+            system: SYSTEM_PROMPT,
+            messages: [{ role: "user", content: userMessage }],
+          },
+          { signal: req.signal },
+        );
         // Forward raw text — the client parses NDJSON.
         claudeStream.on("text", (delta) => {
           controller.enqueue(encoder.encode(delta));
@@ -71,6 +78,10 @@ export async function POST(
         await claudeStream.finalMessage();
         controller.close();
       } catch (err) {
+        if (req.signal.aborted) {
+          controller.close();
+          return;
+        }
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`[compare] error: ${msg}`);
         controller.enqueue(encoder.encode(`\n\n[грешка: ${msg}]`));
