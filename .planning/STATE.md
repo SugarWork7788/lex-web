@@ -42,7 +42,13 @@ Progress: ░░░░░░░░░░ 0%
 ### Decisions
 
 - 2026-05-04: GSD initialized in auto mode (skipped deep questioning + research) because the project is brownfield with deep session context already captured in PROJECT.md.
-- 2026-05-04: All planning + code commits flow through PRs on feature branches (rule in user memory). Current branch: `chore/gsd-setup` will become PR #1 once Step 5 finishes.
+- 2026-05-04: All planning + code commits flow through PRs on feature branches (rule in user memory). PR #1 (chore/gsd-setup) merged.
+- **2026-05-05**: User authentication promoted from "Out of Scope" to a new **v2.3 milestone** (Phases 4–7: Auth foundation → Middleware → Page gating → Premium hooks). Anonymous reading preserved on `/laws` and `/audit` content; only voting + `/intel` + future premium features will be gated. Stripe / billing explicitly stays out of scope; v2.3 only ships the gating hooks.
+
+### Milestone queue
+
+1. **v2.2** (active, Phase 1 next) — Reliability & observability → New AI features → Mobile polish & CodeRabbit
+2. **v2.3** (queued, starts after v2.2) — Auth foundation → Middleware → Page gating → Premium hooks
 
 ### Open questions
 

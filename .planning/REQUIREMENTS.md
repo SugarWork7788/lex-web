@@ -82,14 +82,45 @@ Targeted for the next milestone. Mapped to phases below.
 - [ ] **MOB-01**: Mobile UI improvements — audit-page card density, intel-page filter ergonomics, reader font scaling
 - [ ] **CR-01**: CodeRabbit GitHub App installed on `SugarWork7788/lex-web` so every PR is auto-reviewed (matches the new PR-only workflow rule)
 
+## v2.3 Requirements
+
+Promoted from backlog 2026-05-05. New milestone after v2.2. Reverses the prior "no user accounts" decision in PROJECT.md (anonymous reading still preserved on `/laws` and `/audit` content).
+
+### Auth foundation
+
+- [ ] **AUTH-01**: User can sign up with email + password (verification flow via Supabase Auth)
+- [ ] **AUTH-02**: User can sign in with Google OAuth
+- [ ] **AUTH-03**: `user_profiles` table created with RLS — users can only read/update their own row
+- [ ] **AUTH-04**: Sign-in / sign-up / sign-out UI pages in Bulgarian + `getSession()` server util + `useSession()` client hook
+
+### Auth middleware + protection
+
+- [ ] **AUTH-05**: Next.js middleware enforces auth on opted-in routes; allowlists public reader routes
+- [ ] **AUTH-06**: Unauthenticated request to a protected route → redirect to `/sign-in?returnTo=<path>`; sign-in lands user on returnTo
+- [ ] **AUTH-07**: Server Components in protected routes can call `getSession()` and assume non-null
+
+### Page gating
+
+- [ ] **AUTH-08**: `/audit` voting requires authenticated session; vote attributed to `user_id` in `audit_votes`
+- [ ] **AUTH-09**: `/intel/*` routes require authenticated session
+- [ ] **AUTH-10**: Anonymous users still see `/audit` finding content (vote button shows "Sign in to vote")
+- [ ] **AUTH-11**: `/account` page exists — profile view + sign-out
+
+### Premium tier hooks
+
+- [ ] **AUTH-12**: `user_profiles.tier` enum (`free`, `premium`) added; existing rows backfilled to `free`
+- [ ] **AUTH-13**: `useUserTier()` client hook + `getUserTier()` server util — return enum value or `null` for anonymous
+- [ ] **AUTH-14**: One demo premium-gated capability wired end-to-end (e.g. 5 audit votes/day for premium vs 1 for free)
+
 ## v3.x Backlog (deferred)
 
-These were captured during planning but not in the v2.2 milestone. See `.planning/backlog/` for details once `/gsd-add-backlog` populates them.
+These were captured during planning but not in the v2.2 or v2.3 milestones. See `.planning/backlog/` for details once `/gsd-add-backlog` populates them.
 
 - Stitch design integration (design-system codification)
 - Fine-grained per-route rate-limit tuning + Vercel KV-backed distributed limiter
-- Authenticated saved-laws / saved-findings (would unlock alerts on findings, not just laws)
+- Authenticated saved-laws / saved-findings (now unlockable post-v2.3 since auth lands)
 - Court-decision similarity search
+- Stripe / billing wiring (v2.3 only ships the gating hooks; payment is its own milestone)
 
 ## Out of Scope
 
@@ -118,6 +149,30 @@ These were captured during planning but not in the v2.2 milestone. See `.plannin
 - Mapped to phases: 6
 - Unmapped: 0 ✓
 
+### v2.3 (Auth & Premium hooks)
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| AUTH-01 | Phase 4 | Pending |
+| AUTH-02 | Phase 4 | Pending |
+| AUTH-03 | Phase 4 | Pending |
+| AUTH-04 | Phase 4 | Pending |
+| AUTH-05 | Phase 5 | Pending |
+| AUTH-06 | Phase 5 | Pending |
+| AUTH-07 | Phase 5 | Pending |
+| AUTH-08 | Phase 6 | Pending |
+| AUTH-09 | Phase 6 | Pending |
+| AUTH-10 | Phase 6 | Pending |
+| AUTH-11 | Phase 6 | Pending |
+| AUTH-12 | Phase 7 | Pending |
+| AUTH-13 | Phase 7 | Pending |
+| AUTH-14 | Phase 7 | Pending |
+
+**Coverage (v2.3):**
+- v2.3 requirements: 14 total
+- Mapped to phases: 14
+- Unmapped: 0 ✓
+
 ---
 *Requirements defined: 2026-05-04 (auto mode, brownfield from session context)*
-*Last updated: 2026-05-04 after initial definition*
+*Last updated: 2026-05-05 — added v2.3 Auth & Premium hooks milestone*
