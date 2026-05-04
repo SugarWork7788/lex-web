@@ -75,6 +75,28 @@ All 6 v2.2 requirements mapped to a phase. ✓
 | MOB-01 | 3 |
 | CR-01 | 3 |
 
+## Backlog (parking lot — 999.x)
+
+Ideas captured during planning but not in the v2.2 milestone. Promote into a numbered milestone phase when their time comes.
+
+### Phase 999.1: Stitch design system integration
+**Goal**: Codify the lex-web visual language into a reusable design-system reference (tokens, components, patterns).
+**Source**: User-requested 2026-05-04
+**Why deferred**: v2.2 prioritises functional + reliability work; design-system formalisation is most useful once we have all v2.2 surfaces in their final form.
+**Requirements**: (none yet — would be defined when promoted)
+
+### Phase 999.2: Vercel KV–backed distributed rate limiter
+**Goal**: Replace the per-instance in-memory rate limiter (`lib/rate-limit.ts`) with Vercel KV / Upstash so the limit is shared across all Vercel function instances.
+**Why deferred**: Current single-IP cost-control is sufficient at present traffic; revisit when CC traffic warrants distributed enforcement.
+
+### Phase 999.3: Authenticated saved-laws / saved-findings
+**Goal**: Optional opt-in account so users can save laws + findings, get alerts on findings (not just law-changes).
+**Why deferred**: Adds full auth surface; out-of-scope unless a clear user demand emerges.
+
+### Phase 999.4: Court-decision similarity search
+**Goal**: Find decisions similar to a given one via article-citation overlap + embedding similarity.
+**Why deferred**: Embedding pipeline cost; would also need `article_embeddings` populated (currently empty).
+
 ---
 *Roadmap created: 2026-05-04 (auto mode, derived from session context)*
-*Last updated: 2026-05-04*
+*Last updated: 2026-05-04 — added Backlog (999.x)*
