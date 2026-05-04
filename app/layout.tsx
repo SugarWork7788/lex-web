@@ -88,6 +88,9 @@ export default function RootLayout({
               <Link href="/map" className="hover:underline underline-offset-4">
                 Правна карта
               </Link>
+              <Link href="/intel" className="hover:underline underline-offset-4 text-red-700 dark:text-red-400">
+                Разузнавателен център
+              </Link>
               <Link href="/alerts" className="hover:underline underline-offset-4">
                 Известия
               </Link>

@@ -516,3 +516,165 @@ export async function searchDecisions(
   const { data } = await q;
   return (data ?? []) as CourtDecision[];
 }
+
+// ============================================================
+// Intel Center
+// ============================================================
+
+export type SanctionedEntity = {
+  id: string;
+  name: string | null;
+  entity_type: string | null;
+  sanction_type: string | null;
+  sanctioning_body: string | null;
+  country: string | null;
+  opensanctions_id: string | null;
+};
+
+export type OffshoreEntity = {
+  id: string;
+  name: string | null;
+  jurisdiction: string | null;
+  linked_to: string | null;
+  source_file: string | null;
+  status: string | null;
+  icij_id: string | null;
+  entity_type: string | null;
+};
+
+export type OlafCase = {
+  id: string;
+  title: string | null;
+  date: string | null;
+  fraud_type: string | null;
+  amount_eur: number | null;
+  country: string | null;
+  source_url: string | null;
+};
+
+export type InvestigativeArticle = {
+  id: string;
+  title: string | null;
+  date: string | null;
+  source: string | null;
+  author: string | null;
+  summary: string | null;
+  url: string | null;
+  tags: string[] | null;
+};
+
+export type ProsecutionCase = {
+  id: string;
+  title: string | null;
+  date: string | null;
+  charges: string[] | null;
+  amount_bgn: number | null;
+  source_url: string | null;
+};
+
+export async function getIntelCounts(): Promise<{
+  sanctioned: number; offshore: number; olaf: number;
+  articles: number; prosecution: number; nap: number;
+}> {
+  const tables: ("sanctioned_entities" | "offshore_entities" | "olaf_cases" |
+                 "investigative_articles" | "prosecution_cases" | "nap_rulings")[]
+    = ["sanctioned_entities", "offshore_entities", "olaf_cases",
+       "investigative_articles", "prosecution_cases", "nap_rulings"];
+  const counts = await Promise.all(tables.map(async (t) => {
+    const r = await supabase.from(t).select("id", { count: "exact", head: true });
+    return [t, r.count ?? 0] as const;
+  }));
+  const m = Object.fromEntries(counts);
+  return {
+    sanctioned: m.sanctioned_entities ?? 0,
+    offshore:   m.offshore_entities ?? 0,
+    olaf:       m.olaf_cases ?? 0,
+    articles:   m.investigative_articles ?? 0,
+    prosecution: m.prosecution_cases ?? 0,
+    nap:        m.nap_rulings ?? 0,
+  };
+}
+
+export async function listSanctionedEntities(opts: {
+  search?: string; entity_type?: string; sanctioning_body?: string;
+  page?: number; pageSize?: number;
+}): Promise<{ items: SanctionedEntity[]; total: number }> {
+  const { search, entity_type, sanctioning_body, page = 0, pageSize = 50 } = opts;
+  let q = supabase.from("sanctioned_entities")
+    .select("id,name,entity_type,sanction_type,sanctioning_body,country,opensanctions_id",
+            { count: "exact" })
+    .order("name", { ascending: true });
+  if (search) q = q.ilike("name", `%${search.replace(/[%]/g, " ")}%`);
+  if (entity_type) q = q.eq("entity_type", entity_type);
+  if (sanctioning_body) q = q.eq("sanctioning_body", sanctioning_body);
+  q = q.range(page * pageSize, page * pageSize + pageSize - 1);
+  const { data, count } = await q;
+  return { items: (data ?? []) as SanctionedEntity[], total: count ?? 0 };
+}
+
+export async function listOffshoreEntities(opts: {
+  search?: string; jurisdiction?: string; entity_type?: string;
+  page?: number; pageSize?: number;
+}): Promise<{ items: OffshoreEntity[]; total: number }> {
+  const { search, jurisdiction, entity_type, page = 0, pageSize = 50 } = opts;
+  let q = supabase.from("offshore_entities")
+    .select("id,name,jurisdiction,linked_to,source_file,status,icij_id,entity_type",
+            { count: "exact" })
+    .order("name", { ascending: true, nullsFirst: false });
+  if (search) q = q.ilike("name", `%${search.replace(/[%]/g, " ")}%`);
+  if (jurisdiction) q = q.eq("jurisdiction", jurisdiction);
+  if (entity_type) q = q.eq("entity_type", entity_type);
+  q = q.range(page * pageSize, page * pageSize + pageSize - 1);
+  const { data, count } = await q;
+  return { items: (data ?? []) as OffshoreEntity[], total: count ?? 0 };
+}
+
+export async function listOlafCases(opts: {
+  fraud_type?: string; page?: number; pageSize?: number;
+}): Promise<{ items: OlafCase[]; total: number }> {
+  const { fraud_type, page = 0, pageSize = 30 } = opts;
+  let q = supabase.from("olaf_cases")
+    .select("id,title,date,fraud_type,amount_eur,country,source_url",
+            { count: "exact" })
+    .order("date", { ascending: false, nullsFirst: false });
+  if (fraud_type) q = q.eq("fraud_type", fraud_type);
+  q = q.range(page * pageSize, page * pageSize + pageSize - 1);
+  const { data, count } = await q;
+  return { items: (data ?? []) as OlafCase[], total: count ?? 0 };
+}
+
+export async function listInvestigativeArticles(opts: {
+  search?: string; tag?: string; page?: number; pageSize?: number;
+}): Promise<{ items: InvestigativeArticle[]; total: number }> {
+  const { search, tag, page = 0, pageSize = 30 } = opts;
+  let q = supabase.from("investigative_articles")
+    .select("id,title,date,source,author,summary,url,tags", { count: "exact" })
+    .order("date", { ascending: false, nullsFirst: false });
+  if (search) q = q.ilike("title", `%${search.replace(/[%]/g, " ")}%`);
+  if (tag) q = q.contains("tags", [tag]);
+  q = q.range(page * pageSize, page * pageSize + pageSize - 1);
+  const { data, count } = await q;
+  return { items: (data ?? []) as InvestigativeArticle[], total: count ?? 0 };
+}
+
+export async function listProsecutionCases(opts: {
+  page?: number; pageSize?: number;
+}): Promise<{ items: ProsecutionCase[]; total: number }> {
+  const { page = 0, pageSize = 30 } = opts;
+  const q = supabase.from("prosecution_cases")
+    .select("id,title,date,charges,amount_bgn,source_url", { count: "exact" })
+    .order("date", { ascending: false, nullsFirst: false })
+    .range(page * pageSize, page * pageSize + pageSize - 1);
+  const { data, count } = await q;
+  return { items: (data ?? []) as ProsecutionCase[], total: count ?? 0 };
+}
+
+export async function getDistinctSanctioningBodies(): Promise<string[]> {
+  const { data } = await supabase.from("sanctioned_entities")
+    .select("sanctioning_body").limit(1000);
+  const seen = new Set<string>();
+  for (const r of (data ?? []) as { sanctioning_body: string | null }[]) {
+    if (r.sanctioning_body) seen.add(r.sanctioning_body);
+  }
+  return [...seen].sort();
+}
