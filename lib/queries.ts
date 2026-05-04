@@ -678,3 +678,59 @@ export async function getDistinctSanctioningBodies(): Promise<string[]> {
   }
   return [...seen].sort();
 }
+
+// ============================================================
+// Audit / Национален правен одит
+// ============================================================
+
+export type AuditFinding = {
+  id: string;
+  domain: string;
+  domain_order: number;
+  title: string;
+  severity: "КРИТИЧНО" | "СЕРИОЗНО" | "УМЕРЕНО";
+  description: string;
+  affected_laws: string[];
+  affected_articles: string[];
+  court_decisions_proof: string[];
+  proposed_fix: string | null;
+  why_not_fixable: string | null;
+  who_must_act: string[];
+  authority_level: string | null;
+  reform_steps: string[];
+  reform_timeline: string | null;
+  vote_count: number;
+  generated_at: string;
+};
+
+export async function getAuditFindings(
+  domain?: string, severity?: string,
+): Promise<AuditFinding[]> {
+  let q = supabase.from("audit_findings").select("*")
+    .order("domain_order", { ascending: true });
+  if (domain) q = q.eq("domain", domain);
+  if (severity) q = q.eq("severity", severity);
+  const { data } = await q;
+  return (data ?? []) as AuditFinding[];
+}
+
+export async function getAuditFindingById(id: string): Promise<AuditFinding | null> {
+  const { data } = await supabase.from("audit_findings").select("*").eq("id", id).single();
+  return (data as AuditFinding) ?? null;
+}
+
+export async function getAuditStats(): Promise<{
+  КРИТИЧНО: number; СЕРИОЗНО: number; УМЕРЕНО: number;
+  total: number; domains: number;
+}> {
+  const { data } = await supabase.from("audit_findings").select("severity,domain");
+  const stats = { КРИТИЧНО: 0, СЕРИОЗНО: 0, УМЕРЕНО: 0, total: 0, domains: 0 };
+  const ds = new Set<string>();
+  for (const r of (data ?? []) as { severity: string; domain: string }[]) {
+    if (r.severity in stats) (stats as Record<string, number>)[r.severity]++;
+    stats.total++;
+    ds.add(r.domain);
+  }
+  stats.domains = ds.size;
+  return stats;
+}
