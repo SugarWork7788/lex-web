@@ -76,7 +76,7 @@ export default async function IntelSearchPage({ searchParams }: Props) {
 
         <form action="/intel/search" method="get" className="mt-6 flex gap-2">
           <input name="q" defaultValue={query} required
-            placeholder="Име, фирма или тема — напр. „Бойко Борисов" или „кокаин Варна"…"
+            placeholder={'Име, фирма или тема — напр. „Бойко Борисов" или „кокаин Варна"…'}
             className="flex-1 rounded-md border border-stone-700 bg-stone-900 px-3 py-2.5 text-sm focus:border-red-500 outline-none" />
           <button className="rounded-md bg-red-700 px-5 py-2.5 text-sm font-medium hover:bg-red-600">
             Търси
