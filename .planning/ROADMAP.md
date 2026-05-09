@@ -10,7 +10,7 @@ v2.2 — "Post-security-hardening release". Three phases that close the open aud
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (e.g. 2.1): Urgent insertions (marked `INSERTED`)
 
-- [ ] **Phase 1: Reliability & observability** — fix OpenSanctions OOM risk, surface rate-limit info in UI (1/3 plans complete)
+- [x] **Phase 1: Reliability & observability** — fix OpenSanctions OOM risk, surface rate-limit info in UI (3/3 plans complete)
 - [ ] **Phase 2: New AI features** — Intel search v2 + server-rendered Audit PDF
 - [ ] **Phase 3: Mobile polish & CodeRabbit** — mobile UX pass + GitHub App install
 
@@ -28,8 +28,8 @@ v2.2 — "Post-security-hardening release". Three phases that close the open aud
 
 Plans:
 - [x] 01-00-PLAN.md — Wave 0 bootstrap: install psutil (lex-brain) + vitest+RTL+jsdom (lex-web) and write vitest.config.ts; zero source changes (✓ 2026-05-09, 3 min)
-- [ ] 01-01-PLAN.md — Stream OpenSanctions CSV via fetch_with_retry_stream + io.TextIOWrapper(newline="") into csv.DictReader; psutil RSS sampler asserts peak < 200 MB on a >=100 MB synthetic CSV
-- [ ] 01-02-PLAN.md — useRateLimitedFetch hook + RateLimitToast (aria-live, BG, countdown to 0); HMAC ip_hash + JSON one-liner stdout log inside lib/rate-limit.ts; migrate 8 fetch sites across 6 files (analyze excluded per D-02)
+- [x] 01-01-PLAN.md — Stream OpenSanctions CSV via fetch_with_retry_stream + io.TextIOWrapper(newline="") into csv.DictReader; psutil RSS sampler asserts peak < 200 MB on a >=100 MB synthetic CSV (✓ 2026-05-09; measured peak_rss = 36 MB on 100 MB fixture, ~5.5× safety margin)
+- [x] 01-02-PLAN.md — useRateLimitedFetch hook + RateLimitToast (aria-live, BG, countdown to 0); HMAC ip_hash + JSON one-liner stdout log inside lib/rate-limit.ts; migrate 8 fetch sites across 6 files (analyze excluded per D-02) (✓ 2026-05-09; 8/8 vitest tests, tsc clean, next build green)
 
 ### Phase 2: New AI features
 **Goal**: Ship the next round of user-visible AI value — better intel search, downloadable audit PDF.
@@ -81,8 +81,8 @@ All 6 v2.2 requirements mapped to a phase. ✓
 | Plan | Status | Duration | Tasks | Files | Completed |
 |------|--------|----------|-------|-------|-----------|
 | 01-00 | ✓ Complete | 3 min | 3 | 5 | 2026-05-09 |
-| 01-01 | Ready (Wave 1) | — | — | — | — |
-| 01-02 | Ready (Wave 1) | — | — | — | — |
+| 01-01 | ✓ Complete | 10 min | 3 | 4 | 2026-05-09 |
+| 01-02 | ✓ Complete | 16 min | 3 | 11 | 2026-05-09 |
 
 ---
 
