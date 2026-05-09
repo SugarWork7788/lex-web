@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: milestone
-status: discussing
-last_updated: "2026-05-10T00:00:00Z"
-last_activity: 2026-05-10 -- Phase 02 context gathered (13 decisions captured, ready for /gsd-plan-phase 2)
+status: ui-approved
+last_updated: "2026-05-10T00:30:00Z"
+last_activity: 2026-05-10 -- Phase 02 UI-SPEC approved (6/6 dimensions PASS; ready for /gsd-plan-phase 2)
 progress:
   total_phases: 11
   completed_phases: 1
@@ -24,10 +24,10 @@ See: `.planning/PROJECT.md` (updated 2026-05-04)
 
 ## Current Position
 
-Phase: 02 (new-ai-features) — DISCUSSING (CONTEXT.md written; 13 decisions locked across INT-02 + PDF-01)
+Phase: 02 (new-ai-features) — UI APPROVED (CONTEXT.md + UI-SPEC.md written; 13 locked decisions + 6/6 design dimensions PASS)
 Plan: 0 of 4 (planned: 02-01 intel API ranking, 02-02 intel UI cards, 02-03 audit PDF route, 02-04 audit download button)
 Status: Ready for /gsd-plan-phase 2
-Last activity: 2026-05-10 -- Phase 02 context gathered via /gsd-discuss-phase
+Last activity: 2026-05-10 -- Phase 02 UI-SPEC approved (6/6 dimensions PASS, 2 non-blocking FYIs for planner)
 
 Progress: ███░░░░░░░ 27%
 
