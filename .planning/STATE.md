@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: milestone
-status: shipping
-last_updated: "2026-05-09T19:40:00Z"
-last_activity: 2026-05-09 -- Phase 01 shipped — PR #4 (preview green, MERGEABLE)
+status: discussing
+last_updated: "2026-05-10T00:00:00Z"
+last_activity: 2026-05-10 -- Phase 02 context gathered (13 decisions captured, ready for /gsd-plan-phase 2)
 progress:
   total_phases: 11
   completed_phases: 1
@@ -20,14 +20,14 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-04)
 
 **Core value:** Every Bulgarian citizen can read, understand, and act on the law that affects them — without paying for a lawyer to translate it.
-**Current focus:** Phase 01 — reliability-observability
+**Current focus:** Phase 02 — new-ai-features (intel search v2 + audit PDF download)
 
 ## Current Position
 
-Phase: 01 (reliability-observability) — SHIPPED (PR #4 open, all checks green, awaiting merge)
-Plan: 3 of 3 (Wave 1 finished — 01-01 streamed ingest in lex-brain, 01-02 rate-limit toast+log in lex-web)
-Status: PR #4 open against main — preview deploy READY, CodeRabbit pass, MERGEABLE; D-16 UAT items deferred to post-merge
-Last activity: 2026-05-09 -- Phase 01 shipped via PR #4 (https://github.com/SugarWork7788/lex-web/pull/4)
+Phase: 02 (new-ai-features) — DISCUSSING (CONTEXT.md written; 13 decisions locked across INT-02 + PDF-01)
+Plan: 0 of 4 (planned: 02-01 intel API ranking, 02-02 intel UI cards, 02-03 audit PDF route, 02-04 audit download button)
+Status: Ready for /gsd-plan-phase 2
+Last activity: 2026-05-10 -- Phase 02 context gathered via /gsd-discuss-phase
 
 Progress: ███░░░░░░░ 27%
 
