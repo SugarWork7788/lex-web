@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useRateLimitedFetch } from "@/lib/use-rate-limited-fetch";
+import { RateLimitToast } from "@/app/components/rate-limit-toast";
 
 type Counts = {
   sanctioned: number; offshore: number; olaf: number;
@@ -66,29 +68,43 @@ export function IntelSearchSummary({
   const [status, setStatus] = useState<"idle" | "streaming" | "done" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const startedRef = useRef(false);
+  const rl = useRateLimitedFetch();
 
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
-    const ctrl = new AbortController();
     setStatus("streaming");
     (async () => {
-      try {
-        const res = await fetch("/api/intel/search", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query, counts, samples }),
-          signal: ctrl.signal,
-        });
-        if (!res.ok) {
-          setError(await res.text() || `HTTP ${res.status}`);
-          setStatus("error"); return;
+      const result = await rl.submit("/api/intel/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query, counts, samples }),
+      });
+      if (!result.ok) {
+        if ("rateLimited" in result) {
+          // Toast handles the 429; re-arm so a retry after 0 can fire.
+          startedRef.current = false;
+          setStatus("idle");
+          return;
         }
-        if (!res.body) { setError("Празен отговор"); setStatus("error"); return; }
-        const reader = res.body.getReader();
+        if ("aborted" in result) return;
+        setError(result.error);
+        setStatus("error");
+        return;
+      }
+      const { response, signal } = result;
+      if (!response.body) {
+        setError("Празен отговор");
+        setStatus("error");
+        rl.finish();
+        return;
+      }
+      try {
+        const reader = response.body.getReader();
         const dec = new TextDecoder();
         let acc = "";
         while (true) {
+          if (signal.aborted) break;
           const { done, value } = await reader.read();
           if (done) break;
           acc += dec.decode(value, { stream: true });
@@ -99,30 +115,36 @@ export function IntelSearchSummary({
         if ((e as Error).name === "AbortError") return;
         setError(e instanceof Error ? e.message : String(e));
         setStatus("error");
+      } finally {
+        rl.finish();
       }
     })();
-    return () => ctrl.abort();
+    return () => rl.cancel();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, counts, samples]);
 
   return (
-    <div className="rounded-lg border border-red-800/40 bg-red-950/15 p-5">
-      <div className="text-xs uppercase tracking-wider text-red-400 font-medium mb-2">
-        ✦ AI обобщение
-      </div>
-      {status === "streaming" && text === "" && (
-        <p className="text-sm text-stone-400 italic animate-pulse">Анализирам всички бази…</p>
-      )}
-      {status === "error" && (
-        <p className="text-sm text-red-300">Грешка: {error}</p>
-      )}
-      {text && (
-        <div className="text-stone-100">
-          {renderMarkdown(text)}
-          {status === "streaming" && (
-            <span className="ml-1 inline-block h-3 w-2 animate-pulse bg-red-500 align-middle" />
-          )}
+    <>
+      <RateLimitToast state={rl.rateLimited} onDismiss={rl.dismissRateLimited} />
+      <div className="rounded-lg border border-red-800/40 bg-red-950/15 p-5">
+        <div className="text-xs uppercase tracking-wider text-red-400 font-medium mb-2">
+          ✦ AI обобщение
         </div>
-      )}
-    </div>
+        {status === "streaming" && text === "" && (
+          <p className="text-sm text-stone-400 italic animate-pulse">Анализирам всички бази…</p>
+        )}
+        {status === "error" && (
+          <p className="text-sm text-red-300">Грешка: {error}</p>
+        )}
+        {text && (
+          <div className="text-stone-100">
+            {renderMarkdown(text)}
+            {status === "streaming" && (
+              <span className="ml-1 inline-block h-3 w-2 animate-pulse bg-red-500 align-middle" />
+            )}
+          </div>
+        )}
+      </div>
+    </>
   );
 }

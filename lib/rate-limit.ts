@@ -13,6 +13,24 @@
 //     // ...
 //   }
 
+import { createHmac } from "node:crypto";
+
+const SALT = process.env.AUDIT_VOTE_SALT;
+if (!SALT) {
+  // Match SEC-06: AUDIT_VOTE_SALT is mandatory. Throw at module load so a
+  // missing env var is caught in CI / first deploy, not silently weakened.
+  throw new Error("AUDIT_VOTE_SALT is required");
+}
+
+/** HMAC-SHA-256 of the IP, keyed with AUDIT_VOTE_SALT, truncated to 16 hex
+ *  chars (D-10). 8 bytes is plenty for log scanning; HMAC (not concat-hash
+ *  per the existing audit/vote pattern) resists length-extension and
+ *  rainbow-table attacks. The audit/vote concat-hash divergence is
+ *  documented as a known finding, out of Phase 1 scope. */
+function hashIp(ip: string): string {
+  return createHmac("sha256", SALT!).update(ip).digest("hex").slice(0, 16);
+}
+
 type Entry = number[]; // unix-ms timestamps of recent requests
 
 const store = new Map<string, Entry>();
@@ -54,6 +72,17 @@ export function rateLimited(
     const oldest = arr[0];
     const retryAfter = Math.max(1, Math.ceil((oldest + opts.windowMs - now) / 1000));
     store.set(slot, arr);
+    // D-08, D-09, D-11: emit one JSON-shaped throttle log line per event.
+    // Vercel auto-parses single-line console.log JSON into structured logs.
+    // Strict 5-key shape — extending the shape without re-evaluating the
+    // 256 KB Vercel log line cap is a regression risk (RESEARCH Pitfall 4).
+    console.log(JSON.stringify({
+      event: "rate_limit_throttled",
+      route: key,
+      ip_hash: hashIp(ip),
+      retry_after: retryAfter,
+      ts: new Date().toISOString(),
+    }));
     return new Response(
       JSON.stringify({
         error: "Твърде много заявки. Моля, изчакайте.",
