@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: milestone
-status: executing
-last_updated: "2026-05-09T18:05:00Z"
-last_activity: 2026-05-09 -- Phase 01 Wave 1 complete (01-01 streamed OpenSanctions, 01-02 rate-limit hook/toast/log)
+status: shipping
+last_updated: "2026-05-09T19:40:00Z"
+last_activity: 2026-05-09 -- Phase 01 shipped — PR #4 (preview green, MERGEABLE)
 progress:
   total_phases: 11
   completed_phases: 1
@@ -24,10 +24,10 @@ See: `.planning/PROJECT.md` (updated 2026-05-04)
 
 ## Current Position
 
-Phase: 01 (reliability-observability) — COMPLETE (3/3 plans done; pending verifier + UAT D-16)
+Phase: 01 (reliability-observability) — SHIPPED (PR #4 open, all checks green, awaiting merge)
 Plan: 3 of 3 (Wave 1 finished — 01-01 streamed ingest in lex-brain, 01-02 rate-limit toast+log in lex-web)
-Status: Phase 01 implementation complete; awaiting verifier
-Last activity: 2026-05-09 -- Phase 01 Wave 1 complete (01-01 + 01-02)
+Status: PR #4 open against main — preview deploy READY, CodeRabbit pass, MERGEABLE; D-16 UAT items deferred to post-merge
+Last activity: 2026-05-09 -- Phase 01 shipped via PR #4 (https://github.com/SugarWork7788/lex-web/pull/4)
 
 Progress: ███░░░░░░░ 27%
 
