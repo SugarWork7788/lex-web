@@ -10,7 +10,7 @@ v2.2 — "Post-security-hardening release". Three phases that close the open aud
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (e.g. 2.1): Urgent insertions (marked `INSERTED`)
 
-- [ ] **Phase 1: Reliability & observability** — fix OpenSanctions OOM risk, surface rate-limit info in UI
+- [ ] **Phase 1: Reliability & observability** — fix OpenSanctions OOM risk, surface rate-limit info in UI (1/3 plans complete)
 - [ ] **Phase 2: New AI features** — Intel search v2 + server-rendered Audit PDF
 - [ ] **Phase 3: Mobile polish & CodeRabbit** — mobile UX pass + GitHub App install
 
@@ -24,10 +24,10 @@ v2.2 — "Post-security-hardening release". Three phases that close the open aud
   1. `scripts/scrape_opensanctions.py` (lex-brain) processes the full sanctions CSV with peak RSS < 200 MB on a 4 GB box.
   2. Hitting `/api/chat/[slug]` 11+ times within 60 s shows a UI message with a countdown ("Try again in Ns") instead of a silent failure.
   3. Per-route rate-limit hit/throttle counts are observable from logs (`grep`-able pattern with route name and IP-hash).
-**Plans**: 3 plans
+**Plans**: 3 plans (1 complete, 2 ready as Wave 1)
 
 Plans:
-- [ ] 01-00-PLAN.md — Wave 0 bootstrap: install psutil (lex-brain) + vitest+RTL+jsdom (lex-web) and write vitest.config.ts; zero source changes
+- [x] 01-00-PLAN.md — Wave 0 bootstrap: install psutil (lex-brain) + vitest+RTL+jsdom (lex-web) and write vitest.config.ts; zero source changes (✓ 2026-05-09, 3 min)
 - [ ] 01-01-PLAN.md — Stream OpenSanctions CSV via fetch_with_retry_stream + io.TextIOWrapper(newline="") into csv.DictReader; psutil RSS sampler asserts peak < 200 MB on a >=100 MB synthetic CSV
 - [ ] 01-02-PLAN.md — useRateLimitedFetch hook + RateLimitToast (aria-live, BG, countdown to 0); HMAC ip_hash + JSON one-liner stdout log inside lib/rate-limit.ts; migrate 8 fetch sites across 6 files (analyze excluded per D-02)
 
@@ -75,6 +75,14 @@ All 6 v2.2 requirements mapped to a phase. ✓
 | PDF-01 | 2 |
 | MOB-01 | 3 |
 | CR-01 | 3 |
+
+## Phase 1 progress
+
+| Plan | Status | Duration | Tasks | Files | Completed |
+|------|--------|----------|-------|-------|-----------|
+| 01-00 | ✓ Complete | 3 min | 3 | 5 | 2026-05-09 |
+| 01-01 | Ready (Wave 1) | — | — | — | — |
+| 01-02 | Ready (Wave 1) | — | — | — | — |
 
 ---
 
@@ -203,4 +211,4 @@ Ideas captured during planning but not in the v2.2 milestone. Promote into a num
 
 ---
 *Roadmap created: 2026-05-04 (auto mode, derived from session context)*
-*Last updated: 2026-05-04 — added Backlog (999.x)*
+*Last updated: 2026-05-09 — Phase 1 plan 01-00 complete (Wave 0 test-infra bootstrap)*
