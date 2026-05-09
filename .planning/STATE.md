@@ -1,3 +1,18 @@
+---
+gsd_state_version: 1.0
+milestone: v2.2
+milestone_name: milestone
+status: planning
+last_updated: "2026-05-09T09:40:40.393Z"
+last_activity: 2026-05-04 — GSD initialized in auto mode on `chore/gsd-setup` branch
+progress:
+  total_phases: 11
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
+---
+
 # Project State
 
 ## Project Reference
@@ -19,6 +34,7 @@ Progress: ░░░░░░░░░░ 0%
 ## Performance Metrics
 
 **Velocity:**
+
 - Total plans completed: 0
 - Average duration: —
 - Total execution time: 0 min
@@ -32,6 +48,7 @@ Progress: ░░░░░░░░░░ 0%
 | 3 | 0/3 | — | — |
 
 **Recent Trend:**
+
 - Last 5 plans: —
 - Trend: —
 
