@@ -24,11 +24,12 @@ v2.2 — "Post-security-hardening release". Three phases that close the open aud
   1. `scripts/scrape_opensanctions.py` (lex-brain) processes the full sanctions CSV with peak RSS < 200 MB on a 4 GB box.
   2. Hitting `/api/chat/[slug]` 11+ times within 60 s shows a UI message with a countdown ("Try again in Ns") instead of a silent failure.
   3. Per-route rate-limit hit/throttle counts are observable from logs (`grep`-able pattern with route name and IP-hash).
-**Plans**: 2 plans
+**Plans**: 3 plans
 
 Plans:
-- [ ] 01-01: Stream OpenSanctions CSV via `httpx.stream` + `io.TextIOWrapper` into `csv.DictReader`; add a memory-peak assertion in tests
-- [ ] 01-02: Surface `Retry-After` from `lib/rate-limit.ts` 429 responses in the AI chat UI; add structured throttle log lines
+- [ ] 01-00-PLAN.md — Wave 0 bootstrap: install psutil (lex-brain) + vitest+RTL+jsdom (lex-web) and write vitest.config.ts; zero source changes
+- [ ] 01-01-PLAN.md — Stream OpenSanctions CSV via fetch_with_retry_stream + io.TextIOWrapper(newline="") into csv.DictReader; psutil RSS sampler asserts peak < 200 MB on a >=100 MB synthetic CSV
+- [ ] 01-02-PLAN.md — useRateLimitedFetch hook + RateLimitToast (aria-live, BG, countdown to 0); HMAC ip_hash + JSON one-liner stdout log inside lib/rate-limit.ts; migrate 8 fetch sites across 6 files (analyze excluded per D-02)
 
 ### Phase 2: New AI features
 **Goal**: Ship the next round of user-visible AI value — better intel search, downloadable audit PDF.
