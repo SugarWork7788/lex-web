@@ -39,13 +39,12 @@ Plans:
   1. `/intel/search` returns ranked, multi-source results in <3 s; quotes are extractable and clickable.
   2. `/audit?format=pdf` (or a dedicated route) returns a single PDF file with the `LEX.BRAIN` watermark, regardless of the user's browser print settings.
   3. Audit PDF download fires <10 s for the full 352-finding report.
-**Plans**: 4 plans
+**Plans**: 3 plans (collapsed from 4 per RESEARCH §"Renumbered plan list" — data-fetch + UI cards share files; PDF route + button share a single execution wave). Wave 1 = 02-01; Wave 2 = 02-02 + 02-03 (parallel).
 
 Plans:
-- [ ] 02-01: Intel AI search v2 — refactor `/api/intel/search` to fan-out across sources, rank by relevance, return quote-attributed results
-- [ ] 02-02: Update `/intel/search` UI to render multi-source result cards
-- [ ] 02-03: Server-rendered audit PDF route using a headless renderer (puppeteer-core via Vercel function, or react-pdf) — embeds the SVG watermark
-- [ ] 02-04: Add a "Download as PDF" button to /audit that hits the new route
+- [ ] 02-01-PLAN.md — Supabase tsvector + GIN migration on the 6 intel tables + intel_search_top(q) ranking RPC; idempotent SQL + Node applier; [BLOCKING] live-DB push
+- [ ] 02-02-PLAN.md — Intel ranking helper (lib/intel-search.ts) + <BestMatches>/<BestMatchCard>/<BestMatchQuote> UI per UI-SPEC + /api/intel/quote Haiku 4.5 streaming endpoint
+- [ ] 02-03-PLAN.md — /api/audit/pdf route (puppeteer-core + @sparticuz/chromium) + <DownloadPdfButton /> on /audit + next.config.ts outputFileTracingIncludes + engines.node ≥22.17.0
 
 ### Phase 3: Mobile polish & CodeRabbit
 **Goal**: Make the most-used pages comfortable on mobile and lock in PR-review automation.

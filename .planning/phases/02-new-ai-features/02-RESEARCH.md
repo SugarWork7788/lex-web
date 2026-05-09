@@ -51,7 +51,7 @@ Phase 2 ships INT-02 and PDF-01. Both are short in code volume but each has a si
 
 ### Claude's Discretion (Open Questions resolved by this RESEARCH)
 
-All 7 open questions from CONTEXT.md `<open_questions>` have research answers below — see `## Open Questions Resolved`. The planner inherits those answers as locked once the phase enters execution.
+All 7 open questions from CONTEXT.md `<open_questions>` have research answers below — see `## Open Questions (RESOLVED)`. The planner inherits those answers as locked once the phase enters execution.
 
 ### Deferred Ideas (OUT OF SCOPE)
 
@@ -709,7 +709,7 @@ Total cold: **6–10 s realistic, up to 12 s outlier.** Total warm: **2–4 s.**
 
 **Warning signs:** Vercel function billing shows full-output Haiku token costs even when users navigate away mid-stream.
 
-## Open Questions Resolved
+## Open Questions (RESOLVED)
 
 The 7 open questions from CONTEXT.md `<open_questions>`:
 
