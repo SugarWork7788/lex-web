@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useRateLimitedFetch } from "@/lib/use-rate-limited-fetch";
+import { RateLimitToast } from "@/app/components/rate-limit-toast";
 
 type Turn = { q: string; a: string };
 
@@ -140,20 +142,18 @@ export function LawChat({ slug }: { slug: string }) {
   const [pendingQuestion, setPendingQuestion] = useState("");
   const [pendingAnswer, setPendingAnswer] = useState("");
   const [history, setHistory] = useState<Turn[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [showJumpDown, setShowJumpDown] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const conversationRef = useRef<HTMLDivElement>(null);
-  const abortRef = useRef<AbortController | null>(null);
+  // Hook owns: abort lifecycle, busy, non-429 error, rateLimited countdown.
+  // AI-07 chain preserved by passing rl.cancel() to the stop button and
+  // letting the hook's controller.signal flow into the streaming reader
+  // via fetch's signal arg (handed back as result.signal on success).
+  const rl = useRateLimitedFetch();
   // True if the user is parked at (or near) the bottom — "follow mode".
   // Toggles to false the moment they scroll up, restored when they scroll
   // back down or click the jump-down pill.
   const stickyRef = useRef(true);
-
-  useEffect(() => {
-    return () => abortRef.current?.abort();
-  }, []);
 
   // Track user scroll position; flip out of follow-mode the moment they scroll up.
   useEffect(() => {
@@ -165,11 +165,11 @@ export function LawChat({ slug }: { slug: string }) {
       const atBottom = distFromBottom <= BOTTOM_THRESHOLD;
       stickyRef.current = atBottom;
       // Pill only matters while the AI is still writing.
-      setShowJumpDown(!atBottom && busy);
+      setShowJumpDown(!atBottom && rl.busy);
     };
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
-  }, [busy]);
+  }, [rl.busy]);
 
   // Auto-scroll only when the user is in follow-mode. If they've scrolled up,
   // surface the jump-down pill instead of yanking them back.
@@ -178,10 +178,10 @@ export function LawChat({ slug }: { slug: string }) {
     if (!el) return;
     if (stickyRef.current) {
       el.scrollTop = el.scrollHeight;
-    } else if (busy) {
+    } else if (rl.busy) {
       setShowJumpDown(true);
     }
-  }, [history.length, pendingAnswer, busy]);
+  }, [history.length, pendingAnswer, rl.busy]);
 
   const jumpToBottom = () => {
     const el = conversationRef.current;
@@ -192,49 +192,50 @@ export function LawChat({ slug }: { slug: string }) {
   };
 
   const stop = () => {
-    abortRef.current?.abort();
+    rl.cancel();
   };
 
   const submit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const q = question.trim();
-    if (!q || busy) return;
+    if (!q || rl.busy) return;
     setQuestion("");
     setPendingQuestion(q);
     setPendingAnswer("");
-    setBusy(true);
-    setError(null);
 
-    const controller = new AbortController();
-    abortRef.current = controller;
+    const result = await rl.submit(`/api/chat/${slug}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: q,
+        history: history.slice(-5),
+      }),
+    });
+
+    if (!result.ok) {
+      // 429 → toast handles UI via rl.rateLimited; non-429 → rl.error.
+      // Either way, clear pending question so the row collapses.
+      setPendingQuestion("");
+      textareaRef.current?.focus();
+      return;
+    }
+
+    const { response, signal } = result;
+    if (!response.body) {
+      rl.setError("Празен отговор от сървъра");
+      setPendingQuestion("");
+      rl.finish();
+      textareaRef.current?.focus();
+      return;
+    }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
     let acc = "";
-
     try {
-      const res = await fetch(`/api/chat/${slug}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question: q,
-          history: history.slice(-5),
-        }),
-        signal: controller.signal,
-      });
-      if (!res.ok) {
-        const text = await res.text();
-        setError(text || `HTTP ${res.status}`);
-        setBusy(false);
-        setPendingQuestion("");
-        return;
-      }
-      if (!res.body) {
-        setError("Празен отговор от сървъра");
-        setBusy(false);
-        setPendingQuestion("");
-        return;
-      }
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
       while (true) {
+        // signal is the same controller the hook owns — rl.cancel()
+        // aborts it, the body stream throws, AI-07 chain holds.
+        if (signal.aborted) break;
         const { done, value } = await reader.read();
         if (done) break;
         acc += decoder.decode(value, { stream: true });
@@ -244,11 +245,14 @@ export function LawChat({ slug }: { slug: string }) {
       setPendingAnswer("");
       setPendingQuestion("");
     } catch (err) {
-      if ((err as Error).name === "AbortError") return;
-      setError(err instanceof Error ? err.message : String(err));
+      if ((err as Error).name === "AbortError") {
+        setPendingQuestion("");
+        return;
+      }
+      rl.setError(err instanceof Error ? err.message : String(err));
       setPendingQuestion("");
     } finally {
-      setBusy(false);
+      rl.finish();
       textareaRef.current?.focus();
     }
   };
@@ -265,7 +269,7 @@ export function LawChat({ slug }: { slug: string }) {
     requestAnimationFrame(() => textareaRef.current?.focus());
   };
 
-  const showPending = busy || (pendingAnswer.length > 0 && pendingQuestion);
+  const showPending = rl.busy || (pendingAnswer.length > 0 && pendingQuestion);
 
   return (
     <div className="flex h-full min-h-[520px] flex-col md:min-h-0">
@@ -275,7 +279,7 @@ export function LawChat({ slug }: { slug: string }) {
           <h2 className="font-serif text-base font-semibold">Задай въпрос</h2>
           <span
             className={`inline-flex items-center gap-1.5 text-[11px] ${
-              busy
+              rl.busy
                 ? "text-amber-700 dark:text-amber-300"
                 : "text-black/45 dark:text-white/45"
             }`}
@@ -283,12 +287,12 @@ export function LawChat({ slug }: { slug: string }) {
           >
             <span
               className={`inline-block h-1.5 w-1.5 rounded-full ${
-                busy
+                rl.busy
                   ? "animate-pulse bg-amber-600 dark:bg-amber-400"
                   : "bg-emerald-500"
               }`}
             />
-            {busy ? "пиша…" : "готов"}
+            {rl.busy ? "пиша…" : "готов"}
           </span>
         </div>
         <p className="mt-0.5 text-xs text-black/55 dark:text-white/55">
@@ -296,13 +300,19 @@ export function LawChat({ slug }: { slug: string }) {
         </p>
       </header>
 
+      {/* RATE-LIMIT TOAST (D-04) — above the conversation, dismissible, auto-clears at 0 */}
+      <RateLimitToast
+        state={rl.rateLimited}
+        onDismiss={rl.dismissRateLimited}
+      />
+
       {/* CONVERSATION */}
       <div className="relative flex-1 overflow-hidden">
         <div
           ref={conversationRef}
           className="h-full overflow-y-auto px-6 py-4 [scrollbar-width:thin]"
         >
-          {history.length === 0 && !showPending && !error && (
+          {history.length === 0 && !showPending && !rl.error && (
             <EmptyState onPick={usePill} />
           )}
 
@@ -319,14 +329,14 @@ export function LawChat({ slug }: { slug: string }) {
               <TurnRow
                 question={pendingQuestion}
                 answer={pendingAnswer}
-                streaming={busy}
+                streaming={rl.busy}
               />
             )}
           </ol>
 
-          {error && (
+          {rl.error && (
             <p className="mt-3 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-800/60 dark:bg-red-950/30 dark:text-red-200">
-              Грешка: {error}
+              Грешка: {rl.error}
             </p>
           )}
         </div>
@@ -352,12 +362,12 @@ export function LawChat({ slug }: { slug: string }) {
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             onKeyDown={onKeyDown}
-            disabled={busy}
+            disabled={rl.busy}
             rows={1}
             placeholder="Задайте въпрос за този закон…"
             className="field-sizing-content min-h-[2.5rem] max-h-[6.5rem] flex-1 resize-none overflow-y-auto rounded-md border border-black/15 bg-white px-3 py-2 text-sm leading-snug text-black placeholder-black/40 focus:border-amber-600 focus:outline-none disabled:opacity-60 dark:border-white/15 dark:bg-white/[0.04] dark:text-white dark:placeholder-white/40"
           />
-          {busy ? (
+          {rl.busy ? (
             <button
               type="button"
               onClick={stop}

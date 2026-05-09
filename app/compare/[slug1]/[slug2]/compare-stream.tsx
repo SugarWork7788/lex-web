@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRateLimitedFetch } from "@/lib/use-rate-limited-fetch";
+import { RateLimitToast } from "@/app/components/rate-limit-toast";
 
 type Category = "overlap" | "conflict" | "gap" | "hierarchy";
 type Severity = "нисък" | "среден" | "висок";
@@ -95,38 +97,48 @@ export function CompareStream({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const startedRef = useRef(false);
   const counterRef = useRef(0);
+  const rl = useRateLimitedFetch();
 
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
-    const controller = new AbortController();
     setFindings([]);
     setStatus("loading");
     setErrorMsg(null);
     counterRef.current = 0;
 
     (async () => {
+      const result = await rl.submit(`/api/compare/${slug1}/${slug2}`, {
+        method: "POST",
+      });
+      if (!result.ok) {
+        if ("rateLimited" in result) {
+          // Toast surfaces 429; re-arm so an after-countdown retry can fire.
+          startedRef.current = false;
+          setStatus("loading");
+          return;
+        }
+        if ("aborted" in result) return;
+        setErrorMsg(result.error);
+        setStatus("error");
+        return;
+      }
+      const { response, signal } = result;
+      if (!response.body) {
+        setErrorMsg("Празен отговор");
+        setStatus("error");
+        rl.finish();
+        return;
+      }
+      setStatus("streaming");
       try {
-        const res = await fetch(`/api/compare/${slug1}/${slug2}`, {
-          method: "POST",
-          signal: controller.signal,
-        });
-        if (!res.ok) {
-          const text = await res.text();
-          setErrorMsg(text || `HTTP ${res.status}`);
-          setStatus("error");
-          return;
-        }
-        if (!res.body) {
-          setErrorMsg("Празен отговор");
-          setStatus("error");
-          return;
-        }
-        setStatus("streaming");
-        const reader = res.body.getReader();
+        // JSON-lines decoder — preserved verbatim from the pre-migration
+        // implementation. Only the fetch shell changed.
+        const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
         while (true) {
+          if (signal.aborted) break;
           const { done, value } = await reader.read();
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
@@ -163,9 +175,12 @@ export function CompareStream({
         if ((err as Error).name === "AbortError") return;
         setErrorMsg(err instanceof Error ? err.message : String(err));
         setStatus("error");
+      } finally {
+        rl.finish();
       }
     })();
-    return () => controller.abort();
+    return () => rl.cancel();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug1, slug2]);
 
   const grouped: Record<Category, Finding[]> = {
@@ -178,6 +193,8 @@ export function CompareStream({
 
   return (
     <section className="mt-8">
+      {/* RATE-LIMIT TOAST (D-04) — above the comparison content. */}
+      <RateLimitToast state={rl.rateLimited} onDismiss={rl.dismissRateLimited} />
       {(status === "loading" || (status === "streaming" && findings.length === 0)) && (
         <div className="rounded-lg border border-black/[0.08] bg-white px-5 py-6 text-sm text-black/65 animate-pulse dark:border-white/[0.1] dark:bg-white/[0.03] dark:text-white/65">
           Сравнявам {name1} и {name2}…

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useRateLimitedFetch } from "@/lib/use-rate-limited-fetch";
+import { RateLimitToast } from "@/app/components/rate-limit-toast";
 
 type Tab = "summary" | "chat";
 type Turn = { q: string; a: string };
@@ -102,6 +104,8 @@ function renderMarkdown(text: string): ReactNode {
 
 export function RegulationAI({ celex }: { celex: string }) {
   const [tab, setTab] = useState<Tab>("summary");
+  // ONE shared hook instance — summary + chat never fire concurrently.
+  const rl = useRateLimitedFetch();
 
   return (
     <div className="flex h-full min-h-[520px] flex-col md:min-h-0">
@@ -120,15 +124,23 @@ export function RegulationAI({ celex }: { celex: string }) {
         </div>
       </div>
 
+      {/* RATE-LIMIT TOAST (D-04) — shared across summary + chat panes. */}
+      <RateLimitToast
+        state={rl.rateLimited}
+        onDismiss={rl.dismissRateLimited}
+      />
+
       <div className={tab === "summary" ? "flex-1 min-h-0" : "hidden"}>
-        <SummaryPane celex={celex} active={tab === "summary"} />
+        <SummaryPane celex={celex} active={tab === "summary"} rl={rl} />
       </div>
       <div className={tab === "chat" ? "flex-1 min-h-0" : "hidden"}>
-        <ChatPane celex={celex} />
+        <ChatPane celex={celex} rl={rl} />
       </div>
     </div>
   );
 }
+
+type RL = ReturnType<typeof useRateLimitedFetch>;
 
 function TabButton({
   active,
@@ -154,7 +166,15 @@ function TabButton({
   );
 }
 
-function SummaryPane({ celex, active }: { celex: string; active: boolean }) {
+function SummaryPane({
+  celex,
+  active,
+  rl,
+}: {
+  celex: string;
+  active: boolean;
+  rl: RL;
+}) {
   const [text, setText] = useState("");
   const [status, setStatus] = useState<"idle" | "streaming" | "done" | "error">(
     "idle",
@@ -165,36 +185,39 @@ function SummaryPane({ celex, active }: { celex: string; active: boolean }) {
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
-
-    const controller = new AbortController();
     setStatus("streaming");
     setText("");
     setError(null);
 
     (async () => {
+      const result = await rl.submit(
+        `/api/eu/summarize/${encodeURIComponent(celex)}`,
+        { method: "POST" },
+      );
+      if (!result.ok) {
+        if ("rateLimited" in result) {
+          startedRef.current = false;
+          setStatus("idle");
+          return;
+        }
+        if ("aborted" in result) return;
+        setError(result.error);
+        setStatus("error");
+        return;
+      }
+      const { response, signal } = result;
+      if (!response.body) {
+        setError("Празен отговор");
+        setStatus("error");
+        rl.finish();
+        return;
+      }
       try {
-        const res = await fetch(
-          `/api/eu/summarize/${encodeURIComponent(celex)}`,
-          {
-            method: "POST",
-            signal: controller.signal,
-          },
-        );
-        if (!res.ok) {
-          const t = await res.text();
-          setError(t || `HTTP ${res.status}`);
-          setStatus("error");
-          return;
-        }
-        if (!res.body) {
-          setError("Празен отговор");
-          setStatus("error");
-          return;
-        }
-        const reader = res.body.getReader();
+        const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let acc = "";
         while (true) {
+          if (signal.aborted) break;
           const { done, value } = await reader.read();
           if (done) break;
           acc += decoder.decode(value, { stream: true });
@@ -205,10 +228,13 @@ function SummaryPane({ celex, active }: { celex: string; active: boolean }) {
         if ((err as Error).name === "AbortError") return;
         setError(err instanceof Error ? err.message : String(err));
         setStatus("error");
+      } finally {
+        rl.finish();
       }
     })();
 
-    return () => controller.abort();
+    return () => rl.cancel();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [celex]);
 
   return (
@@ -251,63 +277,56 @@ function SummarySkeleton() {
   );
 }
 
-function ChatPane({ celex }: { celex: string }) {
+function ChatPane({ celex, rl }: { celex: string; rl: RL }) {
   const [question, setQuestion] = useState("");
   const [pendingQuestion, setPendingQuestion] = useState("");
   const [pendingAnswer, setPendingAnswer] = useState("");
   const [history, setHistory] = useState<Turn[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const conversationRef = useRef<HTMLDivElement>(null);
-  const abortRef = useRef<AbortController | null>(null);
-
-  useEffect(() => {
-    return () => abortRef.current?.abort();
-  }, []);
 
   useEffect(() => {
     const el = conversationRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [history.length, pendingAnswer, busy]);
+  }, [history.length, pendingAnswer, rl.busy]);
 
   const submit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const q = question.trim();
-    if (!q || busy) return;
+    if (!q || rl.busy) return;
     setQuestion("");
     setPendingQuestion(q);
     setPendingAnswer("");
-    setBusy(true);
-    setError(null);
 
-    const controller = new AbortController();
-    abortRef.current = controller;
-    let acc = "";
-
-    try {
-      const res = await fetch(`/api/eu/chat/${encodeURIComponent(celex)}`, {
+    const result = await rl.submit(
+      `/api/eu/chat/${encodeURIComponent(celex)}`,
+      {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: q, history: history.slice(-4) }),
-        signal: controller.signal,
-      });
-      if (!res.ok) {
-        const t = await res.text();
-        setError(t || `HTTP ${res.status}`);
-        setBusy(false);
-        setPendingQuestion("");
-        return;
-      }
-      if (!res.body) {
-        setError("Празен отговор");
-        setBusy(false);
-        setPendingQuestion("");
-        return;
-      }
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
+      },
+    );
+
+    if (!result.ok) {
+      setPendingQuestion("");
+      textareaRef.current?.focus();
+      return;
+    }
+
+    const { response, signal } = result;
+    if (!response.body) {
+      rl.setError("Празен отговор");
+      setPendingQuestion("");
+      rl.finish();
+      textareaRef.current?.focus();
+      return;
+    }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let acc = "";
+    try {
       while (true) {
+        if (signal.aborted) break;
         const { done, value } = await reader.read();
         if (done) break;
         acc += decoder.decode(value, { stream: true });
@@ -317,11 +336,14 @@ function ChatPane({ celex }: { celex: string }) {
       setPendingAnswer("");
       setPendingQuestion("");
     } catch (err) {
-      if ((err as Error).name === "AbortError") return;
-      setError(err instanceof Error ? err.message : String(err));
+      if ((err as Error).name === "AbortError") {
+        setPendingQuestion("");
+        return;
+      }
+      rl.setError(err instanceof Error ? err.message : String(err));
       setPendingQuestion("");
     } finally {
-      setBusy(false);
+      rl.finish();
       textareaRef.current?.focus();
     }
   };
@@ -338,12 +360,12 @@ function ChatPane({ celex }: { celex: string }) {
     requestAnimationFrame(() => textareaRef.current?.focus());
   };
 
-  const showPending = busy || (pendingAnswer.length > 0 && pendingQuestion);
+  const showPending = rl.busy || (pendingAnswer.length > 0 && pendingQuestion);
 
   return (
     <div className="flex h-full flex-col">
       <div ref={conversationRef} className="flex-1 overflow-y-auto px-6 py-4">
-        {history.length === 0 && !showPending && !error && (
+        {history.length === 0 && !showPending && !rl.error && (
           <ChatEmptyState onPick={usePill} />
         )}
 
@@ -355,14 +377,14 @@ function ChatPane({ celex }: { celex: string }) {
             <ChatTurn
               question={pendingQuestion}
               answer={pendingAnswer}
-              streaming={busy}
+              streaming={rl.busy}
             />
           )}
         </ol>
 
-        {error && (
+        {rl.error && (
           <p className="mt-3 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-800/60 dark:bg-red-950/30 dark:text-red-200">
-            Грешка: {error}
+            Грешка: {rl.error}
           </p>
         )}
       </div>
@@ -374,18 +396,18 @@ function ChatPane({ celex }: { celex: string }) {
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             onKeyDown={onKeyDown}
-            disabled={busy}
+            disabled={rl.busy}
             rows={1}
             placeholder="Задайте въпрос за акта…"
             className="field-sizing-content min-h-[2.5rem] max-h-[6.5rem] flex-1 resize-none overflow-y-auto rounded-md border border-black/15 bg-white px-3 py-2 text-sm leading-snug text-black placeholder-black/40 focus:border-yellow-600 focus:outline-none disabled:opacity-60 dark:border-white/15 dark:bg-white/[0.04] dark:text-white dark:placeholder-white/40"
           />
           <button
             type="submit"
-            disabled={busy || !question.trim()}
+            disabled={rl.busy || !question.trim()}
             className="shrink-0 rounded-md bg-yellow-700 px-4 py-2 text-sm font-medium text-white hover:bg-yellow-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-yellow-600 dark:hover:bg-yellow-500"
             aria-label="Изпрати"
           >
-            {busy ? "…" : "Изпрати"}
+            {rl.busy ? "…" : "Изпрати"}
           </button>
         </form>
         <p className="mt-1.5 text-[11px] text-black/45 dark:text-white/45">

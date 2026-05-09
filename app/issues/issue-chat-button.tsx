@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useRateLimitedFetch } from "@/lib/use-rate-limited-fetch";
+import { RateLimitToast } from "@/app/components/rate-limit-toast";
 
 type Turn = { q: string; a: string };
 
@@ -105,14 +107,8 @@ export function IssueChatButton({ issueId }: { issueId: string }) {
   const [question, setQuestion] = useState("");
   const [pendingQuestion, setPendingQuestion] = useState("");
   const [pendingAnswer, setPendingAnswer] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const abortRef = useRef<AbortController | null>(null);
-
-  useEffect(() => {
-    return () => abortRef.current?.abort();
-  }, []);
+  const rl = useRateLimitedFetch();
 
   useEffect(() => {
     if (open) {
@@ -123,44 +119,41 @@ export function IssueChatButton({ issueId }: { issueId: string }) {
   const submit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const q = question.trim();
-    if (!q || busy) return;
+    if (!q || rl.busy) return;
     setQuestion("");
     setPendingQuestion(q);
     setPendingAnswer("");
-    setBusy(true);
-    setError(null);
 
-    const controller = new AbortController();
-    abortRef.current = controller;
+    const result = await rl.submit("/api/issues/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        issue_id: issueId,
+        question: q,
+        history: history.slice(-4),
+      }),
+    });
+
+    if (!result.ok) {
+      setPendingQuestion("");
+      textareaRef.current?.focus();
+      return;
+    }
+
+    const { response, signal } = result;
+    if (!response.body) {
+      rl.setError("Празен отговор");
+      setPendingQuestion("");
+      rl.finish();
+      textareaRef.current?.focus();
+      return;
+    }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
     let acc = "";
-
     try {
-      const res = await fetch("/api/issues/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          issue_id: issueId,
-          question: q,
-          history: history.slice(-4),
-        }),
-        signal: controller.signal,
-      });
-      if (!res.ok) {
-        const t = await res.text();
-        setError(t || `HTTP ${res.status}`);
-        setBusy(false);
-        setPendingQuestion("");
-        return;
-      }
-      if (!res.body) {
-        setError("Празен отговор");
-        setBusy(false);
-        setPendingQuestion("");
-        return;
-      }
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
       while (true) {
+        if (signal.aborted) break;
         const { done, value } = await reader.read();
         if (done) break;
         acc += decoder.decode(value, { stream: true });
@@ -170,11 +163,14 @@ export function IssueChatButton({ issueId }: { issueId: string }) {
       setPendingAnswer("");
       setPendingQuestion("");
     } catch (err) {
-      if ((err as Error).name === "AbortError") return;
-      setError(err instanceof Error ? err.message : String(err));
+      if ((err as Error).name === "AbortError") {
+        setPendingQuestion("");
+        return;
+      }
+      rl.setError(err instanceof Error ? err.message : String(err));
       setPendingQuestion("");
     } finally {
-      setBusy(false);
+      rl.finish();
       textareaRef.current?.focus();
     }
   };
@@ -191,8 +187,8 @@ export function IssueChatButton({ issueId }: { issueId: string }) {
     requestAnimationFrame(() => textareaRef.current?.focus());
   };
 
-  const showPending = busy || (pendingAnswer.length > 0 && pendingQuestion);
-  const hasContent = history.length > 0 || showPending || error;
+  const showPending = rl.busy || (pendingAnswer.length > 0 && pendingQuestion);
+  const hasContent = history.length > 0 || showPending || rl.error;
 
   if (!open) {
     return (
@@ -208,6 +204,8 @@ export function IssueChatButton({ issueId }: { issueId: string }) {
 
   return (
     <div className="mt-2 rounded-md border border-amber-300/60 bg-white/80 p-3 dark:border-amber-700/40 dark:bg-white/[0.03]">
+      {/* RATE-LIMIT TOAST (D-04) — sits above the per-issue chat panel. */}
+      <RateLimitToast state={rl.rateLimited} onDismiss={rl.dismissRateLimited} />
       <div className="flex items-center justify-between">
         <span className="text-[11px] uppercase tracking-wide font-semibold text-amber-800 dark:text-amber-300">
           💬 AI чат за този проблем
@@ -231,12 +229,12 @@ export function IssueChatButton({ issueId }: { issueId: string }) {
             <ChatTurn
               question={pendingQuestion}
               answer={pendingAnswer}
-              streaming={busy}
+              streaming={rl.busy}
             />
           )}
-          {error && (
+          {rl.error && (
             <li className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-800 dark:border-red-800/60 dark:bg-red-950/30 dark:text-red-200">
-              Грешка: {error}
+              Грешка: {rl.error}
             </li>
           )}
         </ol>
@@ -263,17 +261,17 @@ export function IssueChatButton({ issueId }: { issueId: string }) {
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           onKeyDown={onKeyDown}
-          disabled={busy}
+          disabled={rl.busy}
           rows={1}
           placeholder="Питайте за този проблем…"
           className="field-sizing-content min-h-[2.25rem] max-h-[5rem] flex-1 resize-none overflow-y-auto rounded-md border border-black/15 bg-white px-2.5 py-1.5 text-xs leading-snug text-black placeholder-black/40 focus:border-amber-600 focus:outline-none disabled:opacity-60 dark:border-white/15 dark:bg-white/[0.04] dark:text-white dark:placeholder-white/40"
         />
         <button
           type="submit"
-          disabled={busy || !question.trim()}
+          disabled={rl.busy || !question.trim()}
           className="shrink-0 rounded-md bg-amber-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-amber-600 dark:hover:bg-amber-500"
         >
-          {busy ? "…" : "Изпрати"}
+          {rl.busy ? "…" : "Изпрати"}
         </button>
       </form>
     </div>
