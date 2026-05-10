@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: milestone
-status: ui-approved
-last_updated: "2026-05-10T11:15:00Z"
-last_activity: 2026-05-10 -- Phase 08 UI-SPEC approved (6/6 dimensions PASS; ready for /gsd-plan-phase 8)
+status: planned
+last_updated: "2026-05-11T00:00:00Z"
+last_activity: 2026-05-10 -- Phase 08 plans verified (3 plans, 2 waves, pass 2 PLANS VERIFIED after 4 UI-SPEC fix-ups)
 progress:
   total_phases: 11
   completed_phases: 1
@@ -24,10 +24,10 @@ See: `.planning/PROJECT.md` (updated 2026-05-04)
 
 ## Current Position
 
-Phase: 08 (dv-gazette) — UI APPROVED (CONTEXT.md + UI-SPEC.md written; 19 locked decisions + 6/6 design dimensions PASS; component inventory: 7 new files mapped)
-Plan: 0 of TBD (plan count set during /gsd-plan-phase 8)
-Status: Ready for /gsd-plan-phase 8 (4 non-blocking FLAGs from ui-checker for planner to fold in: typography size count vs strict policy, regenerate-button TBD, mobile filter density UAT, footer border opacity deviation)
-Last activity: 2026-05-10 -- Phase 08 UI-SPEC approved (6/6 dimensions PASS, 4 non-blocking FLAGs surfaced)
+Phase: 08 (dv-gazette) — PLANNED (3 plans, 2 waves; CONTEXT/RESEARCH/UI-SPEC/PATTERNS/VALIDATION/3×PLAN written; plan-checker VERIFIED on pass 2)
+Plan: 0 of 3 (planned: 08-01 Supabase tsvector migration + lex-brain JSF scraper [Wave 1, 5 tasks, 2 BLOCKING], 08-02 lex-web /dv pages + queries + nav [Wave 2, 3 tasks], 08-03 /api/dv/summarize Sonnet endpoint [Wave 2, 2 tasks])
+Status: Ready for /gsd-execute-phase 8
+Last activity: 2026-05-10 -- Phase 08 plans verified by gsd-plan-checker (pass 2 PLANS VERIFIED after 5 UI-SPEC fix-ups: DV_ACT_PILL palette, double-card-wrap, listing copy/date, detail H1 shape, backfill scope clarification)
 
 Note: Phase 02 (PR #5) is still in flight on `feat/phase-02-ai-features`. Phase 08 forks off `main` and will rebase or merge in `main` once Phase 02 lands. Phase 08 will benefit from Phase 02's tsvector + recency-decay pattern + source-pill design tokens once those merge.
 
