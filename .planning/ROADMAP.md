@@ -68,6 +68,28 @@ Plans:
 
 **Post-merge deferred:** the full 2-year backfill in lex-brain (~10,000 rows × 1.5 s polite delay ≈ 2–3 h). Recipe in 08-01-SUMMARY.md.
 
+### Phase 8.1: DV scraper navigation hotfix [INSERTED 2026-05-11]
+**Goal**: Replace the broken JSF POST-back navigation in `lex-brain/scripts/scrape_dv.py` (which silently aliased every historical-issue request to the most-recent issue's TOC + whose pagination always reset to page 1) with the verified stateless `materiali.faces?idObj=N&razdel_=R` GET per-issue TOC plus a date-filtered `broeveList.faces` POST for issue enumeration. Add a historical-issue smoke against 2025/100 (12 official + 30 unofficial = 42 acts) that catches the alias-to-newest regression class. Add the `dv_acts(issue_id)` btree index that the refetch predicate needs at backfill scale. Repair the 9 corrupt empty-shell `dv_issues` rows from the failed Phase 8 backfill via a `--refetch-empty` second-pass mode. Re-launch the full 2-year backfill once smoke is green.
+**Depends on**: Phase 8 (this is its hotfix; same schema, same lex-web `/dv` UI surfaces the new data automatically once backfill completes)
+**Requirements**: DV-01 (re-affirmed — Phase 8 passed its smoke gate but failed the actual goal of historical-content reachability)
+**Success Criteria** (what must be TRUE):
+  1. `dv_acts(issue_id)` btree index exists on live Supabase (greppable via `pg_indexes WHERE indexname='dv_acts_issue_id_idx'`).
+  2. `scripts/scrape_dv.py` contains zero references to `_post_tab2`, `_post_issue_toc`, `_post_pagination`, `_get_index` (the broken postback layer is gone).
+  3. After running `scripts/scrape_dv.py --issue 2025/100`, dv_acts has exactly 42 rows attributed to (year=2025, issue_number=100), zero jsessionid leaks, zero empty bodies, zero `view_aliasing_detected` events in the smoke log.
+  4. After running `scripts/scrape_dv.py --refetch-empty`, the 9 corrupt-shell `dv_issues` rows (Бр.33–41 of 2026) each have ≥1 act and the `LEFT JOIN COUNT=0` predicate returns 0 rows for that range.
+  5. The full 2-year backfill is running in background with zero `view_aliasing_detected` events at the 5-minute progress check.
+  6. Phase 8 helpers byte-identical: `scripts/_lib/dv_jsf.py` + `scripts/_lib/http_retry.py` + `tests/test_dv_jsf.py` are zero-diff vs Phase 8 (D-06 + D-12 invariants).
+**Plans**: 1 plan, 4 tasks (single wave)
+
+Plans:
+- [ ] 08.1-01-PLAN.md — Wave 1: (1) lex-web `db/dv_schema.sql` index append + idempotent re-apply; (2) lex-brain `scripts/scrape_dv.py` rewrite (stateless GET TOC + broeveList.faces enum + view-aliasing guard + `--refetch-empty` mode); (3) lex-brain `tests/test_dv_navigation.py` (7 unit + 4 live tests gated by `RUN_LIVE_DV_TESTS=1`); plus **2 BLOCKING checkpoints** — manual smoke + DB verification for 2025/100, then `--refetch-empty` repair + full backfill kickoff (D-04 + D-05).
+
+**UI hint**: no (UI is correct, just starved of data — the existing `/dv` listing + `/dv/[slug]` surfaces populate automatically as backfill runs)
+
+**Cross-repo PRs (mirrors Phase 8 model):**
+- lex-web: `db/dv_schema.sql` + ROADMAP + 08.1-01-SUMMARY.md (small, idempotent additive index)
+- lex-brain: branch `feat/phase-08.1-scraper-hotfix` — `scripts/scrape_dv.py` rewrite + `tests/test_dv_navigation.py` new file
+
 ### Phase 3: Mobile polish & CodeRabbit
 **Goal**: Make the most-used pages comfortable on mobile and lock in PR-review automation.
 **Depends on**: Phase 2 (PDF download must be reachable on mobile)
@@ -94,7 +116,7 @@ All 8 v2.2 requirements mapped to a phase. ✓
 | RL-01 | 1 |
 | INT-02 | 2 |
 | PDF-01 | 2 |
-| DV-01 | 8 |
+| DV-01 | 8 (closed by 8.1) |
 | DV-02 | 8 |
 | MOB-01 | 3 |
 | CR-01 | 3 |
@@ -242,4 +264,4 @@ Ideas captured during planning but not in the v2.2 milestone. Promote into a num
 
 ---
 *Roadmap created: 2026-05-04 (auto mode, derived from session context)*
-*Last updated: 2026-05-10 — Phase 2 implementation complete (3/3 plans; PDF-01 + INT-02 closed; verifier next)*
+*Last updated: 2026-05-11 — Phase 8.1 inserted (1 plan, 4 tasks, 2 BLOCKING checkpoints; addresses Phase 8 backfill failure)*
