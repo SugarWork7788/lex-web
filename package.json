@@ -8,12 +8,15 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "db:intel-fts": "tsx scripts/apply-intel-fts.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.92.0",
+    "@sparticuz/chromium": "^148.0.0",
     "@supabase/supabase-js": "^2.105.1",
     "next": "16.2.4",
+    "puppeteer-core": "^24.43.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "resend": "^6.12.2"
@@ -34,8 +37,12 @@
     "jsdom": "^29.1.1",
     "pg": "^8.20.0",
     "tailwindcss": "^4",
+    "tsx": "^4.20.0",
     "typescript": "^5",
     "vitest": "^4.1.5"
+  },
+  "engines": {
+    "node": ">=22.17.0"
   },
   "ignoreScripts": [
     "sharp",

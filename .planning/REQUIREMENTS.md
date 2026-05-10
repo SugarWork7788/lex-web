@@ -74,8 +74,8 @@ Targeted for the next milestone. Mapped to phases below.
 
 ### Features
 
-- [ ] **INT-02**: Intel AI search v2 — better ranking, multi-source quote-style results, more responsive streaming
-- [ ] **PDF-01**: Server-rendered single-file PDF export of /audit with the `LEX.BRAIN` watermark (currently print-CSS only; replaces browser-print pipeline)
+- [x] **INT-02**: Intel AI search v2 — better ranking, multi-source quote-style results, more responsive streaming (closed by 02-02 on 2026-05-10)
+- [x] **PDF-01**: Server-rendered single-file PDF export of /audit with the `LEX.BRAIN` watermark (closed by 02-03 on 2026-05-10 — `/api/audit/pdf` route via puppeteer-core + @sparticuz/chromium triggers existing `@media print` block; `<DownloadPdfButton />` mounted on /audit stats row)
 
 ### UX + Ops
 
@@ -139,8 +139,8 @@ These were captured during planning but not in the v2.2 or v2.3 milestones. See 
 |-------------|-------|--------|
 | OS-01 | Phase 1 | Pending |
 | RL-01 | Phase 1 | Pending |
-| INT-02 | Phase 2 | Pending |
-| PDF-01 | Phase 2 | Pending |
+| INT-02 | Phase 2 | ✓ Complete (02-02) |
+| PDF-01 | Phase 2 | ✓ Complete (02-03) |
 | MOB-01 | Phase 3 | Pending |
 | CR-01 | Phase 3 | Pending |
 

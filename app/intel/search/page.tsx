@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { searchTopRanked } from "@/lib/intel-search";
 import { IntelSearchSummary } from "./intel-search-summary";
+import { BestMatches } from "./best-matches";
 
 export const revalidate = 0;
 export const metadata = { title: "AI търсене — Разузнавателен център" };
@@ -46,7 +48,12 @@ async function searchAll(q: string) {
 export default async function IntelSearchPage({ searchParams }: Props) {
   const { q } = await searchParams;
   const query = (q ?? "").trim();
-  const r = query ? await searchAll(query) : null;
+  // Parallel: existing 6-source ILIKE fan-out + new ranking RPC. Both are
+  // independent queries against the same Supabase project so Promise.all
+  // keeps the page render budget tight (CONTEXT.md success-criterion <3s).
+  const [r, topRanked] = query
+    ? await Promise.all([searchAll(query), searchTopRanked(query)])
+    : [null, [] as Awaited<ReturnType<typeof searchTopRanked>>];
 
   const counts = r ? {
     sanctioned: r.sanctioned.length, offshore: r.offshore.length, olaf: r.olaf.length,
@@ -93,6 +100,8 @@ export default async function IntelSearchPage({ searchParams }: Props) {
         {query && r && counts && samples && (
           <div className="mt-8 space-y-6">
             <IntelSearchSummary query={query} counts={counts} samples={samples} />
+
+            <BestMatches items={topRanked} query={query} />
 
             <ResultGroup
               title={`Санкции (${r.sanctioned.length})`}
