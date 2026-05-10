@@ -9,6 +9,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
+    "db:dv-schema": "tsx scripts/apply-dv-schema.ts",
     "db:intel-fts": "tsx scripts/apply-intel-fts.ts"
   },
   "dependencies": {
@@ -37,7 +38,7 @@
     "jsdom": "^29.1.1",
     "pg": "^8.20.0",
     "tailwindcss": "^4",
-    "tsx": "^4.20.0",
+    "tsx": "^4.21.0",
     "typescript": "^5",
     "vitest": "^4.1.5"
   },

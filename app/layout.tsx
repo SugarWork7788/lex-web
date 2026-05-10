@@ -82,6 +82,9 @@ export default function RootLayout({
               <Link href="/issues" className="hover:underline underline-offset-4">
                 Проблеми
               </Link>
+              <Link href="/dv" className="hover:underline underline-offset-4">
+                Държавен вестник
+              </Link>
               <Link href="/compare" className="hover:underline underline-offset-4">
                 Сравни
               </Link>

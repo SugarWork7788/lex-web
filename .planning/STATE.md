@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: milestone
-status: shipping
-last_updated: "2026-05-10T09:30:00Z"
-last_activity: 2026-05-10 -- Phase 02 shipped — PR #5 (preview green, MERGEABLE)
+status: in_progress
+last_updated: "2026-05-11T00:40:00Z"
+last_activity: 2026-05-11 -- Phase 02 PR #5 merged; Phase 08 PR #6 conflict-resolution against new main; DV backfill launched (PID 84212).
 progress:
   total_phases: 11
-  completed_phases: 2
-  total_plans: 6
-  completed_plans: 6
-  percent: 55
+  completed_phases: 3
+  total_plans: 9
+  completed_plans: 9
+  percent: 75
 ---
 
 # Project State
@@ -20,24 +20,28 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-04)
 
 **Core value:** Every Bulgarian citizen can read, understand, and act on the law that affects them — without paying for a lawyer to translate it.
-**Current focus:** Phase 02 — new-ai-features (intel search v2 + audit PDF download)
+**Current focus:** v2.2 ship sequence — Phase 02 + Phase 08 both merging; only Phase 03 (Mobile + CodeRabbit) left in this milestone.
 
 ## Current Position
 
-Phase: 02 (new-ai-features) — SHIPPED (PR #5 open, Vercel preview green, CodeRabbit pending, MERGEABLE)
-Plan: 3 of 3 (02-01 ✓ + 02-02 ✓ + 02-03 ✓ — Wave 2 parallel done; PDF-01 + INT-02 closed)
-Status: PR #5 open against main — preview deploy READY, MERGEABLE; 6 manual UAT items deferred to preview verification before merge
-Last activity: 2026-05-10 -- Phase 02 shipped via PR #5 (https://github.com/SugarWork7788/lex-web/pull/5)
+Phases 1, 2, 8 — **MERGED** to main:
+  - Phase 02 (PR #5): MERGED 2026-05-10T21:36:52Z (squash → e7d1cfc)
+  - Phase 08 (PR #6): merging now — conflict-resolution merge against new `main` (Phase 2 collision on STATE.md, package.json, bun.lock — resolved)
+  - lex-brain Phase 08 (PR #7): clean 2-commit branch awaiting review
 
-Progress: █████░░░░░ 55%
+**Active background process:** DV 2-year backfill (PID 84212) running in lex-brain since 2026-05-10T21:33:56Z. ~2–3 h ETA. Log: `/Users/beyond/Desktop/lex-brain/logs/scrapers/dv.log`. Resumable; idempotent inserts.
+
+Next phase in milestone v2.2: Phase 03 (Mobile polish + CodeRabbit GitHub App).
+
+Progress: ████████░░ 75%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 6
-- Average duration: ~12 min
-- Total execution time: ~72 min
+- Total plans completed: 9 (Phase 1 + Phase 2 + Phase 8)
+- Average duration: ~22 min
+- Total execution time: ~197 min
 
 **By Phase:**
 
@@ -46,11 +50,12 @@ Progress: █████░░░░░ 55%
 | 1 | 3/3 | ~29 min | ~10 min |
 | 2 | 3/3 | ~43 min | ~14 min |
 | 3 | 0/3 | — | — |
+| 8 | 3/3 | ~125 min | ~42 min |
 
 **Recent Trend:**
 
-- Last 5 plans: 02-03 (~10 min, 2 auto-fix cycles: @sparticuz/chromium@148 API drift, Uint8Array→BodyInit TS variance), 02-02 (~8 min, 3 auto-fix cycles), 02-01 (~25 min, 1 deviation cycle: IMMUTABLE wrapper for GENERATED column), 01-02 (16 min, parallel with 01-01), 01-01 (10 min, parallel with 01-02)
-- Trend: → (Phase 2 wave 2 was clean parallel execution: zero file overlap between 02-02 and 02-03, both committed to the same feature branch with interleaved hashes, full test suite stays green throughout)
+- Last 5 plans: 08-03 (~30 min, parallel agent), 08-02 (~30 min, parallel agent), 08-01 (~65 min, main-context with 2 BLOCKING), 02-03 (~10 min, 2 auto-fix cycles), 02-02 (~8 min, 3 auto-fix cycles)
+- Trend: ↑ (Phase 8 plans larger because 08-01 spans two repos + surfaces JSF protocol bugs at runtime; Phase 2 plans tight thanks to clean parallel execution + auto-fix cycles)
 
 **Plan history:**
 
@@ -62,6 +67,9 @@ Progress: █████░░░░░ 55%
 | 02-new-ai-features | 01 | ~25 min | 3 + 1 deviation | 4 (db/intel_fts.sql, scripts/apply-intel-fts.ts, package.json, bun.lock) | 2026-05-10 |
 | 02-new-ai-features | 02 | ~8 min | 3 + 3 auto-fix | 9 (lib/intel-search.ts, app/api/intel/quote/route.ts, app/intel/search/{best-matches,best-match-card,best-match-quote}.tsx, app/intel/search/page.tsx, 3 test files) | 2026-05-10 |
 | 02-new-ai-features | 03 | ~10 min | 3 + 2 auto-fix | 6 (package.json, next.config.ts, app/api/audit/pdf/route.ts, app/audit/download-pdf-button.tsx, app/audit/page.tsx, __tests__/audit-pdf-route.test.ts) | 2026-05-10 |
+| 08-dv-gazette | 01 | ~65 min | 5 (2 BLOCKING) | 8 (across 2 repos) | 2026-05-10 |
+| 08-dv-gazette | 02 | ~30 min | 3 | 13 | 2026-05-11 |
+| 08-dv-gazette | 03 | ~30 min | 2 | 2 | 2026-05-11 |
 
 *Updated after each plan completion*
 
@@ -69,6 +77,12 @@ Progress: █████░░░░░ 55%
 
 ### Decisions
 
+- 2026-05-11 (08-01): DV act-title extraction lives in the `<td>`'s text between `</strong><br>` and the `стр. N` page-marker — NOT the `<a href="showMaterialDV.jsp">` link text (always "Преглед на материала"). Caught at runtime during smoke; first parser run produced 10 rows with `act_type="Other"`. Fix: `_extract_title_for_anchor()` walks up to the parent `<td>`, splits text on `<br>`, skips `<strong>` body + anchor text + page-marker.
+- 2026-05-11 (08-01): `apply-dv-schema.ts` adds `ssl: { rejectUnauthorized: false }` to mirror Phase 2's `apply-schema.ts` working pattern (Supabase TLS chain). Without it the live connect rejects.
+- 2026-05-11 (08-01): lex-brain Phase 8 branched off `chore/post-phase-02-state-update` (5 unmerged Phase 1 follow-ups) rather than `main` — needed `fetch_with_retry_stream` infra. Rebase later when post-phase-02 lands on lex-brain `main`.
+- 2026-05-11 (08-03): Hard-coded model literal `"claude-sonnet-4-6"` (no env var, no constant) — required for the plan's grep-test acceptance gate. Model upgrade is a deliberate code change, not config.
+- 2026-05-11 (08-02): vitest jest-dom matchers wired via `__tests__/setup.ts` + `setupFiles` in `vitest.config.ts`. Phase 1 left a gap (didn't import `@testing-library/jest-dom` globally); 08-02 fixed it. All prior 8 tests still green after the change.
+- 2026-05-11 (08-02): All Bulgarian date formatters pinned to `timeZone: "Europe/Sofia"` to avoid CI/Vercel TZ shift (host TZ would render `2026-05-08` as `07.05.2026` west of UTC).
 - 2026-05-04: GSD initialized in auto mode (skipped deep questioning + research) because the project is brownfield with deep session context already captured in PROJECT.md.
 - 2026-05-04: All planning + code commits flow through PRs on feature branches (rule in user memory). PR #1 (chore/gsd-setup) merged.
 - **2026-05-05**: User authentication promoted from "Out of Scope" to a new **v2.3 milestone** (Phases 4–7). Anonymous reading preserved on `/laws` and `/audit` content; only voting + `/intel` + future premium features will be gated. Stripe / billing explicitly stays out of scope; v2.3 only ships the gating hooks.
@@ -100,6 +114,9 @@ Progress: █████░░░░░ 55%
 
 ### Pitfalls
 
+- **DV TOC parsing — anchor text is useless.** `<a href="showMaterialDV.jsp?idMat=N">` always renders "Преглед на материала". Real act title is the `<td>` text between `</strong><br>` and `стр. N`. The full smoke-test loop (10 acts × 2 razdel sections × ~1.5 s polite delay = ~45 s) is the only way to catch a regression here at the data-quality level.
+- **DV `infer_act_type` 10-type list is incomplete.** Issue 2026/42 contained 2 acts with prefixes the regex didn't recognize: `Определение` (court ruling) + `Споразумение` (international agreement). Both fall through to `Other`. Acceptable per RESEARCH Q3 but the user-facing `/dv` filter chips will undercount these. Future expansion should add more prefixes or move to a curated dictionary.
+- **lex-brain branch on `chore/post-phase-02-state-update`** — phase 8 branched off this state-update branch (not `main`) because Phase 1 follow-ups (`fetch_with_retry_stream`) are needed by the DV scraper. Rebase later when those Phase 1 follow-ups land on lex-brain `main`.
 - Phase 2's PDF route must use Node runtime (Vercel Edge can't spawn puppeteer). Stay consistent with the existing streaming-route pattern: `runtime: "nodejs"` + explicit `maxDuration`.
 - Phase 1's rate-limit UI message must be accessible — don't gate behind a hover-only tooltip.
 - Vitest 4 dropped the `basic` reporter — the plan's smoke-test command needs the default reporter (or `default`/`verbose`/`tap`). Discovered while running 01-00 Task 3.
@@ -108,10 +125,10 @@ Progress: █████░░░░░ 55%
 
 ### Last session
 
-- **Last session:** 2026-05-10T08:39:00Z — 2026-05-10T08:50:00Z (~10 min wall, 02-03 executed end-to-end including 2 auto-fix cycles; ran parallel with 02-02)
-- **Stopped at:** Phase 2 implementation complete — 02-03 done: PDF-01 closed via `/api/audit/pdf` route (puppeteer-core + @sparticuz/chromium) + `<DownloadPdfButton />` mounted on `/audit` stats row + Next 16 `outputFileTracingIncludes` pinning the chromium binary into the function bundle. NFT trace contains all 4 chromium brotli archives. 42/42 tests green; build green. Wave 2 parallel safety preserved (zero file overlap with 02-02; commits `8c9ea93/546216e/9fd586a` interleaved with 02-02's `dcc4f98/604db85/3ceadda`).
-- **Resume file:** None — Phase 2 implementation done. Next: `/gsd-verify-phase 2`.
+- **Last session:** 2026-05-10T22:11:00Z — 2026-05-11T00:40:00Z (~2.5 h wall; Phase 8 executed in 2 waves; Phase 2 + Phase 8 PRs merged)
+- **Stopped at:** Phase 02 PR #5 squash-merged → main; Phase 08 PR #6 mid-conflict-resolution against new main; DV 2-year backfill running in lex-brain (PID 84212).
+- **Resume file:** None — once PR #6 lands, only Phase 03 (Mobile + CodeRabbit) remains in milestone v2.2. Watch the backfill log; CodeRabbit auto-installs in Phase 03 itself.
 
 ---
 *State initialized: 2026-05-04*
-*Last plan complete: 2026-05-10 -- 02-03 (audit PDF download via puppeteer + chromium; PDF-01 closed; Phase 2 implementation complete)*
+*Last plan complete: 2026-05-11 -- 08-02 + 08-03 (Wave 2 parallel: lex-web /dv UI + /api/dv/summarize endpoint)*

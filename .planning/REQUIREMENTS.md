@@ -82,6 +82,11 @@ Targeted for the next milestone. Mapped to phases below.
 - [ ] **MOB-01**: Mobile UI improvements — audit-page card density, intel-page filter ergonomics, reader font scaling
 - [ ] **CR-01**: CodeRabbit GitHub App installed on `SugarWork7788/lex-web` so every PR is auto-reviewed (matches the new PR-only workflow rule)
 
+### State Gazette (added 2026-05-10)
+
+- [ ] **DV-01**: lex-brain scraper for dv.parliament.bg (Държавен вестник) — backfills 2 years of issues (~100 issues, 3000–5000 acts) into `dv_issues` + `dv_acts` Supabase tables; resumable by `(year, issue_number)` and `idMat`; honors ≥1 s polite delay; structured progress log; identifies itself via User-Agent
+- [ ] **DV-02**: lex-web `/dv` and `/dv/[issue]` pages — issue listing with pagination + search/filter by act type; per-issue act listing with original-source links; per-act AI summary endpoint (POST `/api/dv/summarize` streaming Anthropic, rate-limited); nav link in `app/layout.tsx`
+
 ## v2.3 Requirements
 
 Promoted from backlog 2026-05-05. New milestone after v2.2. Reverses the prior "no user accounts" decision in PROJECT.md (anonymous reading still preserved on `/laws` and `/audit` content).
@@ -143,10 +148,12 @@ These were captured during planning but not in the v2.2 or v2.3 milestones. See 
 | PDF-01 | Phase 2 | ✓ Complete (02-03) |
 | MOB-01 | Phase 3 | Pending |
 | CR-01 | Phase 3 | Pending |
+| DV-01 | Phase 8 | Pending |
+| DV-02 | Phase 8 | Pending |
 
 **Coverage (v2.2):**
-- v2.2 requirements: 6 total
-- Mapped to phases: 6
+- v2.2 requirements: 8 total
+- Mapped to phases: 8
 - Unmapped: 0 ✓
 
 ### v2.3 (Auth & Premium hooks)
