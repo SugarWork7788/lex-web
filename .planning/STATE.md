@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: milestone
 status: in_progress
-last_updated: "2026-05-11T00:40:00Z"
-last_activity: 2026-05-11 -- Phase 02 PR #5 merged; Phase 08 PR #6 conflict-resolution against new main; DV backfill launched (PID 84212).
+last_updated: "2026-05-11T02:50:00Z"
+last_activity: 2026-05-11 -- Phase 8.1 hotfix complete (stateless GET rewrite + 9 corrupt shells repaired); full backfill running (PID 94740).
 progress:
   total_phases: 11
-  completed_phases: 3
-  total_plans: 9
-  completed_plans: 9
-  percent: 75
+  completed_phases: 4
+  total_plans: 10
+  completed_plans: 10
+  percent: 80
 ---
 
 # Project State
