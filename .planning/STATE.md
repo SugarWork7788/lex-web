@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: milestone
 status: in_progress
-last_updated: "2026-05-11T00:00:00Z"
-last_activity: 2026-05-11 -- Phase 08 executed end-to-end (3 plans, 2 waves; verifier PASS-WITH-DEFERRED-BACKFILL)
+last_updated: "2026-05-11T00:30:00Z"
+last_activity: 2026-05-11 -- Phase 08 shipped — PR #6 (lex-web). lex-brain side still needs its own PR.
 progress:
   total_phases: 11
   completed_phases: 2
@@ -24,9 +24,10 @@ See: `.planning/PROJECT.md` (updated 2026-05-04)
 
 ## Current Position
 
-Phase: 08 (dv-gazette) — **COMPLETE** (3/3 plans, verifier PASS-WITH-DEFERRED-BACKFILL on 2026-05-11)
-Status: Ready to ship — `/gsd-ship 8` (PR + cross-AI review). Post-merge: launch the 2-year backfill in lex-brain.
-Last activity: 2026-05-11 -- Phase 08 verifier: 4/4 ROADMAP SCs verified, 13/13 threats mitigated, 55/55 vitest, build registers /dv + /dv/[slug] + /api/dv/summarize. Live DB has issue 2026/42 ingested as smoke (10 acts, 0 leaks).
+Phase: 08 (dv-gazette) — **SHIPPED** (PR #6 open, 21 commits ahead of main)
+Status: PR open at https://github.com/SugarWork7788/lex-web/pull/6 — awaiting CI + review.
+Pending companion: lex-brain `feat/phase-08-dv-gazette` branch (2 commits) needs its own PR before this PR can land with backfill ready.
+Last activity: 2026-05-11 -- Phase 08 PR #6 opened; STATE updated to reflect ship.
 
 Note: Phase 02 (PR #5) is still in flight on `feat/phase-02-ai-features`. Phase 08 forks off `main` and will rebase or merge in `main` once Phase 02 lands. Phase 08 will benefit from Phase 02's tsvector + recency-decay pattern + source-pill design tokens once those merge.
 
