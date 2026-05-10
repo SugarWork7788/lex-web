@@ -43,11 +43,21 @@ ALTER TABLE investigative_articles ADD COLUMN IF NOT EXISTS search_vector tsvect
   ) STORED;
 CREATE INDEX IF NOT EXISTS investigative_articles_fts ON investigative_articles USING gin(search_vector);
 
+-- IMMUTABLE wrapper for array_to_string.
+-- Postgres marks the built-in array_to_string(anyarray, text) as STABLE, but
+-- GENERATED ALWAYS columns require strictly IMMUTABLE expressions. This
+-- wrapper is a pure SQL passthrough on text[] inputs (no catalog lookups,
+-- no locale-sensitive coercion), so promoting it to IMMUTABLE is safe:
+-- given the same (text[], text) inputs, output is deterministic.
+-- Used by the prosecution_cases.search_vector generated column below.
+CREATE OR REPLACE FUNCTION immutable_array_to_string(text[], text) RETURNS text
+  LANGUAGE sql IMMUTABLE AS $$ SELECT array_to_string($1, $2) $$;
+
 -- 5. prosecution_cases: title + charges (text[]) + full_text (truncated).
 ALTER TABLE prosecution_cases ADD COLUMN IF NOT EXISTS search_vector tsvector
   GENERATED ALWAYS AS (
     setweight(to_tsvector('simple', coalesce(title, '')), 'A') ||
-    setweight(to_tsvector('simple', array_to_string(coalesce(charges, ARRAY[]::text[]), ' ')), 'B') ||
+    setweight(to_tsvector('simple', immutable_array_to_string(coalesce(charges, ARRAY[]::text[]), ' ')), 'B') ||
     setweight(to_tsvector('simple', left(coalesce(full_text, ''), 50000)), 'C')
   ) STORED;
 CREATE INDEX IF NOT EXISTS prosecution_cases_fts ON prosecution_cases USING gin(search_vector);
