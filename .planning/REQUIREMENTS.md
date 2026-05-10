@@ -74,7 +74,7 @@ Targeted for the next milestone. Mapped to phases below.
 
 ### Features
 
-- [ ] **INT-02**: Intel AI search v2 — better ranking, multi-source quote-style results, more responsive streaming
+- [x] **INT-02**: Intel AI search v2 — better ranking, multi-source quote-style results, more responsive streaming (closed by 02-02 on 2026-05-10)
 - [ ] **PDF-01**: Server-rendered single-file PDF export of /audit with the `LEX.BRAIN` watermark (currently print-CSS only; replaces browser-print pipeline)
 
 ### UX + Ops
@@ -139,7 +139,7 @@ These were captured during planning but not in the v2.2 or v2.3 milestones. See 
 |-------------|-------|--------|
 | OS-01 | Phase 1 | Pending |
 | RL-01 | Phase 1 | Pending |
-| INT-02 | Phase 2 | Pending |
+| INT-02 | Phase 2 | ✓ Complete (02-02) |
 | PDF-01 | Phase 2 | Pending |
 | MOB-01 | Phase 3 | Pending |
 | CR-01 | Phase 3 | Pending |

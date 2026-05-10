@@ -43,7 +43,7 @@ Plans:
 
 Plans:
 - [x] 02-01-PLAN.md — Supabase tsvector + GIN migration on the 6 intel tables + intel_search_top(q) ranking RPC; idempotent SQL + Node applier; [BLOCKING] live-DB push (✓ 2026-05-10, ~25 min, 1 deviation cycle: IMMUTABLE wrapper for array_to_string in GENERATED column)
-- [ ] 02-02-PLAN.md — Intel ranking helper (lib/intel-search.ts) + <BestMatches>/<BestMatchCard>/<BestMatchQuote> UI per UI-SPEC + /api/intel/quote Haiku 4.5 streaming endpoint
+- [x] 02-02-PLAN.md — Intel ranking helper (lib/intel-search.ts) + <BestMatches>/<BestMatchCard>/<BestMatchQuote> UI per UI-SPEC + /api/intel/quote Haiku 4.5 streaming endpoint (✓ 2026-05-10, ~8 min, 3 auto-fix cycles; 31 vitest cases added; INT-02 closed)
 - [ ] 02-03-PLAN.md — /api/audit/pdf route (puppeteer-core + @sparticuz/chromium) + <DownloadPdfButton /> on /audit + next.config.ts outputFileTracingIncludes + engines.node ≥22.17.0
 
 ### Phase 3: Mobile polish & CodeRabbit
@@ -88,7 +88,7 @@ All 6 v2.2 requirements mapped to a phase. ✓
 | Plan | Status | Duration | Tasks | Files | Completed |
 |------|--------|----------|-------|-------|-----------|
 | 02-01 | ✓ Complete | ~25 min | 3 + 1 deviation (Rule 1) | 4 (db/intel_fts.sql, scripts/apply-intel-fts.ts, package.json, bun.lock) | 2026-05-10 |
-| 02-02 | ⏳ Ready (Wave 2) | — | — | — | — |
+| 02-02 | ✓ Complete | ~8 min | 3 + 3 auto-fix (Rule 1×2, Rule 3×1) | 9 (lib/intel-search.ts, app/api/intel/quote/route.ts, app/intel/search/{best-matches,best-match-card,best-match-quote}.tsx, app/intel/search/page.tsx, 3 test files) | 2026-05-10 |
 | 02-03 | ⏳ Ready (Wave 2) | — | — | — | — |
 
 ---
