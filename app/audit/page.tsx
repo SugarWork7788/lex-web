@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getAuditFindings, getAuditStats, type AuditFinding } from "@/lib/queries";
 import { VoteButton } from "./vote-button";
+import { DownloadPdfButton } from "./download-pdf-button";
 
 export const revalidate = 60;
 export const metadata = {
@@ -88,13 +89,16 @@ export default async function AuditPage({ searchParams }: Props) {
           </p>
         </header>
 
-        <ul className="mt-6 flex flex-wrap gap-x-4 gap-y-2 text-sm">
-          <Stat n={stats.КРИТИЧНО} label="критични" tone="red" />
-          <Stat n={stats.СЕРИОЗНО} label="сериозни" tone="orange" />
-          <Stat n={stats.УМЕРЕНО}  label="умерени" tone="yellow" />
-          <Stat n={stats.domains}  label="домейни" tone="stone" />
-          <Stat n={stats.total}    label="общо находки" tone="stone" />
-        </ul>
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
+          <ul className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+            <Stat n={stats.КРИТИЧНО} label="критични" tone="red" />
+            <Stat n={stats.СЕРИОЗНО} label="сериозни" tone="orange" />
+            <Stat n={stats.УМЕРЕНО}  label="умерени" tone="yellow" />
+            <Stat n={stats.domains}  label="домейни" tone="stone" />
+            <Stat n={stats.total}    label="общо находки" tone="stone" />
+          </ul>
+          <DownloadPdfButton className="print:hidden" />
+        </div>
 
         <TimelineRoadmap buckets={timelineBuckets} />
 

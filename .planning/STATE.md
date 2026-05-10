@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: milestone
 status: in_progress
-last_updated: "2026-05-11T00:30:00Z"
-last_activity: 2026-05-11 -- Phase 08 shipped — PR #6 (lex-web). lex-brain side still needs its own PR.
+last_updated: "2026-05-11T00:40:00Z"
+last_activity: 2026-05-11 -- Phase 02 PR #5 merged; Phase 08 PR #6 conflict-resolution against new main; DV backfill launched (PID 84212).
 progress:
   total_phases: 11
-  completed_phases: 2
-  total_plans: 6
-  completed_plans: 6
-  percent: 36
+  completed_phases: 3
+  total_plans: 9
+  completed_plans: 9
+  percent: 75
 ---
 
 # Project State
@@ -20,44 +20,42 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-04)
 
 **Core value:** Every Bulgarian citizen can read, understand, and act on the law that affects them — without paying for a lawyer to translate it.
-**Current focus:** Phase 08 — dv-gazette (Държавен вестник scraper + browser); Phase 02 in flight on parallel branch (PR #5)
+**Current focus:** v2.2 ship sequence — Phase 02 + Phase 08 both merging; only Phase 03 (Mobile + CodeRabbit) left in this milestone.
 
 ## Current Position
 
-Phase: 08 (dv-gazette) — **SHIPPED** (both PRs open)
-Status:
-  - lex-web PR #6: https://github.com/SugarWork7788/lex-web/pull/6 (22 commits ahead of main)
-  - lex-brain PR #7: https://github.com/SugarWork7788/lex-brain/pull/7 (clean 2-commit branch `feat/phase-08-dv-scraper` rebased onto current main)
-Both awaiting CI + review.
-Last activity: 2026-05-11 -- Both PRs opened; lex-brain branch rebased clean (4 stale Phase 1 follow-ups dropped — they were unrelated to Phase 8 and unmerged elsewhere).
+Phases 1, 2, 8 — **MERGED** to main:
+  - Phase 02 (PR #5): MERGED 2026-05-10T21:36:52Z (squash → e7d1cfc)
+  - Phase 08 (PR #6): merging now — conflict-resolution merge against new `main` (Phase 2 collision on STATE.md, package.json, bun.lock — resolved)
+  - lex-brain Phase 08 (PR #7): clean 2-commit branch awaiting review
 
-Note: Phase 02 (PR #5) is still in flight on `feat/phase-02-ai-features`. Phase 08 forks off `main` and will rebase or merge in `main` once Phase 02 lands. Phase 08 will benefit from Phase 02's tsvector + recency-decay pattern + source-pill design tokens once those merge.
+**Active background process:** DV 2-year backfill (PID 84212) running in lex-brain since 2026-05-10T21:33:56Z. ~2–3 h ETA. Log: `/Users/beyond/Desktop/lex-brain/logs/scrapers/dv.log`. Resumable; idempotent inserts.
 
-**Deferred (post-merge operator step, NOT a phase merge gate):** full 2-year DV backfill in lex-brain (~250 issues × ~30–50 acts ≈ 10,000 rows; resumable). Recipe documented in 08-01-SUMMARY.md.
+Next phase in milestone v2.2: Phase 03 (Mobile polish + CodeRabbit GitHub App).
 
-Progress: ████░░░░░░ 36%
+Progress: ████████░░ 75%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 6
-- Average duration: ~25 min
-- Total execution time: ~150 min
+- Total plans completed: 9 (Phase 1 + Phase 2 + Phase 8)
+- Average duration: ~22 min
+- Total execution time: ~197 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1 | 3/3 | ~29 min | ~10 min |
-| 2 | 0/4 | — | — |
+| 2 | 3/3 | ~43 min | ~14 min |
 | 3 | 0/3 | — | — |
 | 8 | 3/3 | ~125 min | ~42 min |
 
 **Recent Trend:**
 
-- Last 5 plans: 08-03 (~30 min, parallel agent), 08-02 (~30 min, parallel agent), 08-01 (~65 min, main-context with 2 BLOCKING), 01-02 (16 min), 01-01 (10 min)
-- Trend: ↑ (Phase 8 plans are larger; 08-01 spans two repos and surfaces JSF protocol bugs at runtime)
+- Last 5 plans: 08-03 (~30 min, parallel agent), 08-02 (~30 min, parallel agent), 08-01 (~65 min, main-context with 2 BLOCKING), 02-03 (~10 min, 2 auto-fix cycles), 02-02 (~8 min, 3 auto-fix cycles)
+- Trend: ↑ (Phase 8 plans larger because 08-01 spans two repos + surfaces JSF protocol bugs at runtime; Phase 2 plans tight thanks to clean parallel execution + auto-fix cycles)
 
 **Plan history:**
 
@@ -66,6 +64,9 @@ Progress: ████░░░░░░ 36%
 | 01-reliability-observability | 00 | 3 min | 3 | 5 | 2026-05-09 |
 | 01-reliability-observability | 01 | ~10 min | 3 | 4 | 2026-05-09 |
 | 01-reliability-observability | 02 | ~16 min | 3 | 11 | 2026-05-09 |
+| 02-new-ai-features | 01 | ~25 min | 3 + 1 deviation | 4 (db/intel_fts.sql, scripts/apply-intel-fts.ts, package.json, bun.lock) | 2026-05-10 |
+| 02-new-ai-features | 02 | ~8 min | 3 + 3 auto-fix | 9 (lib/intel-search.ts, app/api/intel/quote/route.ts, app/intel/search/{best-matches,best-match-card,best-match-quote}.tsx, app/intel/search/page.tsx, 3 test files) | 2026-05-10 |
+| 02-new-ai-features | 03 | ~10 min | 3 + 2 auto-fix | 6 (package.json, next.config.ts, app/api/audit/pdf/route.ts, app/audit/download-pdf-button.tsx, app/audit/page.tsx, __tests__/audit-pdf-route.test.ts) | 2026-05-10 |
 | 08-dv-gazette | 01 | ~65 min | 5 (2 BLOCKING) | 8 (across 2 repos) | 2026-05-10 |
 | 08-dv-gazette | 02 | ~30 min | 3 | 13 | 2026-05-11 |
 | 08-dv-gazette | 03 | ~30 min | 2 | 2 | 2026-05-11 |
@@ -92,6 +93,15 @@ Progress: ████░░░░░░ 36%
 - 2026-05-09 (01-01): Test monkeypatched `scripts._lib.http_retry.time.sleep` (module-bound name) instead of global `time.sleep` to match the existing sync-helper test convention in the same file.
 - 2026-05-09 (01-02): Local `.env.local` gained `AUDIT_VOTE_SALT=local-dev-salt-do-not-deploy-this-value` (git-ignored) so the new module-load throw in `lib/rate-limit.ts` doesn't block local `bunx next build`. Production already has the real salt on Vercel.
 - 2026-05-09 (01-02): Hook re-arm + toast announce-once both keyed on a derived `isActive = state !== null` boolean for clearer null↔set transition semantics; behaviour identical to RESEARCH Pattern 3 / 5.
+- **2026-05-10 (02-01)**: Postgres `array_to_string(anyarray, text)` is STABLE; `GENERATED ALWAYS` columns require IMMUTABLE expressions. Wrapped via `immutable_array_to_string(text[], text) LANGUAGE sql IMMUTABLE` pure passthrough — safe because the underlying built-in is deterministic on `text[]` inputs. Used in `prosecution_cases.search_vector` generated expression. Pattern reusable for any future GENERATED column needing a STABLE built-in (e.g., `lower(text)` is already IMMUTABLE; `concat_ws` is STABLE — would need similar wrapper).
+- **2026-05-10 (02-01)**: `intel_search_top(q text)` SQL function is the canonical scoring contract. Constants 0.7 / 0.3 / 365 are hardcoded in the SQL; plan 02-02 must import the same constants in TS for any client-side recomputation/test.
+- **2026-05-10 (02-02)**: `lib/intel-search.ts` mirrors the SQL constants (`LEX_WEIGHT=0.7`, `RECENCY_WEIGHT=0.3`, `RECENCY_HALF_LIFE_DAYS=365`) for unit testing — keep both in sync if the SQL is retuned. The helper falls back to `[]` on RPC error/throw with `console.warn` so the page still renders the per-source breakdown if `intel_search_top` is missing on a staging DB.
+- **2026-05-10 (02-02)**: Anthropic SDK in test environments is mocked via `vi.mock("@anthropic-ai/sdk", ...)` returning a synthetic class with a stream handle that fires `text` deltas + `finalMessage()`. Lets routes assert on model identity, signal forwarding, and system-prompt content without live API access. Pattern reusable for future Anthropic-backed routes.
+- **2026-05-10 (02-02)**: `@testing-library/jest-dom` matchers (`toBeInTheDocument`) are NOT available in this vitest project (no setup file registered). Component tests use plain Vitest assertions (`toBeTruthy`, `not.toBeNull`, className regex matches). Avoids touching `vitest.config.ts`. If future plans want jest-dom matchers, add `setupFiles: ["@testing-library/jest-dom/vitest"]` and re-enable.
+- **2026-05-10 (02-03)**: `@sparticuz/chromium@148` removed `defaultViewport` and `headless` static getters from the class (only `args`, `setGraphicsMode`, `executablePath` remain). Canonical v148 launch shape per upstream README is literal viewport + `headless: "shell"` literal + `puppeteer.defaultArgs({args: chromium.args, headless: "shell"})` for arg composition. RESEARCH Pattern 4 referred to an older v141ish API. Future puppeteer-using routes must follow the v148 shape; plan-time research should always check `node_modules/@sparticuz/chromium/build/esm/index.d.ts` directly.
+- **2026-05-10 (02-03)**: `page.pdf()` returns `Uint8Array<ArrayBufferLike>`; DOM `BodyInit` requires an `ArrayBuffer`-backed Uint8Array under TypeScript strict (variance issue, not a real shape bug). Wrap puppeteer binary outputs in `Buffer.from(pdf)` before constructing a Response — Node Buffer extends `Uint8Array<ArrayBuffer>` and is V8 zero-copy share. Pattern reusable for any future binary-Response route that consumes puppeteer / sharp / similar Uint8Array<ArrayBufferLike> producers.
+- **2026-05-10 (02-03)**: Next 16 `outputFileTracingIncludes` is the TOP-LEVEL config key (NOT under `experimental.*` — that was the Next 14 placement; promoted to stable since v15). Verified against `node_modules/next/dist/docs/01-app/03-api-reference/05-config/01-next-config-js/output.md` line 90 per AGENTS.md "this is NOT the Next.js you know" mandate. Future plans that pin native binaries (sharp, ffmpeg, etc.) into the Vercel function bundle must use the same top-level shape, not `experimental`.
+- **2026-05-10 (02-03)**: NFT trace at `.next/server/app/api/audit/pdf/route.js.nft.json` contained 588 files including all 4 chromium brotli archives (al2023.tar.br, chromium.br, fonts.tar.br, swiftshader.tar.br) under the narrow `node_modules/@sparticuz/chromium/bin/**/*` glob. No widening to `lib/**/*` was required. RESEARCH Pitfall 3 fallback (widen the glob if Vercel deploy fails with "Could not find Chromium (rev. ...)") remains pre-emptively documented in `next.config.ts` for the first deploy.
 
 ### Milestone queue
 
@@ -115,9 +125,9 @@ Progress: ████░░░░░░ 36%
 
 ### Last session
 
-- **Last session:** 2026-05-10T22:11:00Z — 2026-05-11T00:30:00Z (~2.3 h wall; Phase 8 executed in 2 waves)
-- **Stopped at:** Phase 08 complete (3/3 plans, verifier PASS-WITH-DEFERRED-BACKFILL). Wave 1 in main context with 2 BLOCKING checkpoints (live DB push + live-net scraper smoke); Wave 2 in parallel worktrees (08-02 UI + 08-03 endpoint). All gates green: 55/55 vitest, tsc clean, build registers /dv + /dv/[slug] + /api/dv/summarize. lex-brain has 16/16 pytest on dv_jsf module. Live DB has issue 2026/42 ingested (10 acts, 0 jsessionid leaks, 0 missing bodies).
-- **Resume file:** None — next step is `/gsd-ship 8` (PR + cross-AI review). Post-merge: launch the 2-year DV backfill (`nohup uv run python scripts/scrape_dv.py > logs/scrapers/dv-backfill.log 2>&1 &` from lex-brain).
+- **Last session:** 2026-05-10T22:11:00Z — 2026-05-11T00:40:00Z (~2.5 h wall; Phase 8 executed in 2 waves; Phase 2 + Phase 8 PRs merged)
+- **Stopped at:** Phase 02 PR #5 squash-merged → main; Phase 08 PR #6 mid-conflict-resolution against new main; DV 2-year backfill running in lex-brain (PID 84212).
+- **Resume file:** None — once PR #6 lands, only Phase 03 (Mobile + CodeRabbit) remains in milestone v2.2. Watch the backfill log; CodeRabbit auto-installs in Phase 03 itself.
 
 ---
 *State initialized: 2026-05-04*

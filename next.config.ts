@@ -30,6 +30,24 @@ const SECURITY_HEADERS = [
 ];
 
 const nextConfig: NextConfig = {
+  // PDF-01 / Phase 2 plan 02-03 — pin the @sparticuz/chromium binary into the
+  // Vercel function bundle for /api/audit/pdf. NFT static analysis can't see
+  // through chromium.executablePath() (computed at runtime), so we explicitly
+  // include the brotli archives via this glob.
+  //
+  // Top-level key per Next 16 (verified against
+  // node_modules/next/dist/docs/01-app/03-api-reference/05-config/01-next-config-js/output.md
+  // line 90 — was under `experimental.*` in Next 14, promoted to stable since v15).
+  //
+  // If first deploy fails with "Could not find Chromium (rev. ...)", widen the
+  // glob to also include `node_modules/@sparticuz/chromium/lib/**/*` per
+  // RESEARCH §Pitfall 3.
+  //
+  // Do NOT add `serverExternalPackages: ["puppeteer-core", "@sparticuz/chromium"]`
+  // — Next 16 auto-externalises both packages out of the box.
+  outputFileTracingIncludes: {
+    "/api/audit/pdf": ["node_modules/@sparticuz/chromium/bin/**/*"],
+  },
   async redirects() {
     return [
       { source: "/court", destination: "/courts", permanent: true },
