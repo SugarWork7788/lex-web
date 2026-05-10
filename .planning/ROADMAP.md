@@ -42,7 +42,7 @@ Plans:
 **Plans**: 3 plans (collapsed from 4 per RESEARCH §"Renumbered plan list" — data-fetch + UI cards share files; PDF route + button share a single execution wave). Wave 1 = 02-01; Wave 2 = 02-02 + 02-03 (parallel).
 
 Plans:
-- [ ] 02-01-PLAN.md — Supabase tsvector + GIN migration on the 6 intel tables + intel_search_top(q) ranking RPC; idempotent SQL + Node applier; [BLOCKING] live-DB push
+- [x] 02-01-PLAN.md — Supabase tsvector + GIN migration on the 6 intel tables + intel_search_top(q) ranking RPC; idempotent SQL + Node applier; [BLOCKING] live-DB push (✓ 2026-05-10, ~25 min, 1 deviation cycle: IMMUTABLE wrapper for array_to_string in GENERATED column)
 - [ ] 02-02-PLAN.md — Intel ranking helper (lib/intel-search.ts) + <BestMatches>/<BestMatchCard>/<BestMatchQuote> UI per UI-SPEC + /api/intel/quote Haiku 4.5 streaming endpoint
 - [ ] 02-03-PLAN.md — /api/audit/pdf route (puppeteer-core + @sparticuz/chromium) + <DownloadPdfButton /> on /audit + next.config.ts outputFileTracingIncludes + engines.node ≥22.17.0
 
@@ -82,6 +82,14 @@ All 6 v2.2 requirements mapped to a phase. ✓
 | 01-00 | ✓ Complete | 3 min | 3 | 5 | 2026-05-09 |
 | 01-01 | ✓ Complete | 10 min | 3 | 4 | 2026-05-09 |
 | 01-02 | ✓ Complete | 16 min | 3 | 11 | 2026-05-09 |
+
+## Phase 2 progress
+
+| Plan | Status | Duration | Tasks | Files | Completed |
+|------|--------|----------|-------|-------|-----------|
+| 02-01 | ✓ Complete | ~25 min | 3 + 1 deviation (Rule 1) | 4 (db/intel_fts.sql, scripts/apply-intel-fts.ts, package.json, bun.lock) | 2026-05-10 |
+| 02-02 | ⏳ Ready (Wave 2) | — | — | — | — |
+| 02-03 | ⏳ Ready (Wave 2) | — | — | — | — |
 
 ---
 
@@ -210,4 +218,4 @@ Ideas captured during planning but not in the v2.2 milestone. Promote into a num
 
 ---
 *Roadmap created: 2026-05-04 (auto mode, derived from session context)*
-*Last updated: 2026-05-09 — Phase 1 plan 01-00 complete (Wave 0 test-infra bootstrap)*
+*Last updated: 2026-05-10 — Phase 2 plan 02-01 complete (Supabase tsvector + GIN migration applied to live DB; Wave 2 ready)*
