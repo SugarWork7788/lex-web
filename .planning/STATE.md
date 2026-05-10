@@ -24,10 +24,12 @@ See: `.planning/PROJECT.md` (updated 2026-05-04)
 
 ## Current Position
 
-Phase: 08 (dv-gazette) — **SHIPPED** (PR #6 open, 21 commits ahead of main)
-Status: PR open at https://github.com/SugarWork7788/lex-web/pull/6 — awaiting CI + review.
-Pending companion: lex-brain `feat/phase-08-dv-gazette` branch (2 commits) needs its own PR before this PR can land with backfill ready.
-Last activity: 2026-05-11 -- Phase 08 PR #6 opened; STATE updated to reflect ship.
+Phase: 08 (dv-gazette) — **SHIPPED** (both PRs open)
+Status:
+  - lex-web PR #6: https://github.com/SugarWork7788/lex-web/pull/6 (22 commits ahead of main)
+  - lex-brain PR #7: https://github.com/SugarWork7788/lex-brain/pull/7 (clean 2-commit branch `feat/phase-08-dv-scraper` rebased onto current main)
+Both awaiting CI + review.
+Last activity: 2026-05-11 -- Both PRs opened; lex-brain branch rebased clean (4 stale Phase 1 follow-ups dropped — they were unrelated to Phase 8 and unmerged elsewhere).
 
 Note: Phase 02 (PR #5) is still in flight on `feat/phase-02-ai-features`. Phase 08 forks off `main` and will rebase or merge in `main` once Phase 02 lands. Phase 08 will benefit from Phase 02's tsvector + recency-decay pattern + source-pill design tokens once those merge.
 
