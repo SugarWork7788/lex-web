@@ -47,6 +47,22 @@ Plans:
 - [ ] 02-03: Server-rendered audit PDF route using a headless renderer (puppeteer-core via Vercel function, or react-pdf) — embeds the SVG watermark
 - [ ] 02-04: Add a "Download as PDF" button to /audit that hits the new route
 
+### Phase 8: Държавен вестник (State Gazette) browser
+**Goal**: Make the Bulgarian State Gazette (dv.parliament.bg) browseable + searchable inside lex-web — issues, acts, and AI summaries — sourced from a polite, resumable scraper in lex-brain.
+**Depends on**: Phase 1 (rate-limit hook + structured-log pattern reused for any new public endpoint)
+**Requirements**: DV-01, DV-02
+**Success Criteria** (what must be TRUE):
+  1. lex-brain scraper backfills the most recent 2 years of issues (~100 issues, ~3000–5000 acts) into `dv_issues` + `dv_acts` Supabase tables; resumable by `(year, issue_number)` + `idMat`; respects ≥1 s polite delay; surfaces a structured progress log.
+  2. `/dv` lists issues with number, date, count of acts; pagination works; results render in <2 s for the listing page.
+  3. `/dv/[issue]` shows all acts in one issue with title, type, and link to the original `dv.parliament.bg` source; per-act AI summary is reachable via a button (or inline streaming card).
+  4. "Държавен вестник" link is visible in the main nav.
+**Plans**: TBD (set during /gsd-plan-phase 8)
+
+Plans:
+- [ ] 08-NN: TBD — set during plan-phase
+
+**UI hint**: yes (listing page + issue detail + nav addition)
+
 ### Phase 3: Mobile polish & CodeRabbit
 **Goal**: Make the most-used pages comfortable on mobile and lock in PR-review automation.
 **Depends on**: Phase 2 (PDF download must be reachable on mobile)
@@ -65,7 +81,7 @@ Plans:
 
 ## Coverage
 
-All 6 v2.2 requirements mapped to a phase. ✓
+All 8 v2.2 requirements mapped to a phase. ✓
 
 | Requirement | Phase |
 |-------------|-------|
@@ -73,6 +89,8 @@ All 6 v2.2 requirements mapped to a phase. ✓
 | RL-01 | 1 |
 | INT-02 | 2 |
 | PDF-01 | 2 |
+| DV-01 | 8 |
+| DV-02 | 8 |
 | MOB-01 | 3 |
 | CR-01 | 3 |
 
