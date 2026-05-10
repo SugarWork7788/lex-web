@@ -734,3 +734,188 @@ export async function getAuditStats(): Promise<{
   stats.domains = ds.size;
   return stats;
 }
+
+// ============================================================
+// Държавен вестник (State Gazette) queries — Phase 8
+// ============================================================
+
+export type DvIssueRow = {
+  id: string;
+  issue_number: number;
+  year: number;
+  issue_supplement: number;
+  date: string | null;
+  title: string | null;
+  source_url: string | null;
+  act_count: number; // joined count from dv_acts
+  top_act_types: string[]; // top-3 act types by frequency in this issue
+};
+
+export type DvActRow = {
+  id: string;
+  issue_id: string;
+  issue_number: number;
+  year: number;
+  act_number: string | null;
+  title: string;
+  act_type: string | null;
+  full_text: string | null;
+  source_url: string | null;
+  razdel: number | null;
+  summary_ai: string | null;
+  summary_ai_generated_at: string | null;
+};
+
+/**
+ * List dv_issues with pagination + per-issue act count + top-3 act types.
+ * Used by /dv listing page.
+ *
+ * Returns { items: [], total: 0 } on error so the page still renders
+ * (D-04 fallback contract — query helpers never throw).
+ */
+export async function listDvIssues(opts: {
+  page: number;
+  pageSize: number;
+  year?: number;
+  from_date?: string;
+  to_date?: string;
+  from_issue?: number;
+  to_issue?: number;
+}): Promise<{ items: DvIssueRow[]; total: number }> {
+  const offset = opts.page * opts.pageSize;
+  let q = supabase
+    .from("dv_issues")
+    .select(
+      "id, issue_number, year, issue_supplement, date, title, source_url",
+      { count: "exact" },
+    )
+    .order("year", { ascending: false })
+    .order("issue_number", { ascending: false })
+    .range(offset, offset + opts.pageSize - 1);
+
+  if (opts.year !== undefined) q = q.eq("year", opts.year);
+  if (opts.from_date) q = q.gte("date", opts.from_date);
+  if (opts.to_date) q = q.lte("date", opts.to_date);
+  if (opts.from_issue !== undefined) q = q.gte("issue_number", opts.from_issue);
+  if (opts.to_issue !== undefined) q = q.lte("issue_number", opts.to_issue);
+
+  const { data, error, count } = await q;
+  if (error) {
+    console.error("[listDvIssues] error", error);
+    return { items: [], total: 0 };
+  }
+
+  const issueIds = (data ?? []).map((i) => i.id);
+  if (issueIds.length === 0) return { items: [], total: count ?? 0 };
+
+  // Fetch acts for these issues to compute act_count + top-3 act types.
+  const { data: acts } = await supabase
+    .from("dv_acts")
+    .select("issue_id, act_type")
+    .in("issue_id", issueIds);
+
+  const actsByIssue = new Map<string, string[]>();
+  for (const a of (acts ?? []) as { issue_id: string; act_type: string | null }[]) {
+    const arr = actsByIssue.get(a.issue_id) ?? [];
+    if (a.act_type) arr.push(a.act_type);
+    actsByIssue.set(a.issue_id, arr);
+  }
+
+  const items: DvIssueRow[] = (data ?? []).map((i) => {
+    const types = actsByIssue.get(i.id) ?? [];
+    const freq = new Map<string, number>();
+    for (const t of types) freq.set(t, (freq.get(t) ?? 0) + 1);
+    const topTypes = [...freq.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map((e) => e[0]);
+    return {
+      id: i.id,
+      issue_number: i.issue_number,
+      year: i.year,
+      issue_supplement: i.issue_supplement,
+      date: i.date,
+      title: i.title,
+      source_url: i.source_url,
+      act_count: types.length,
+      top_act_types: topTypes,
+    };
+  });
+
+  return { items, total: count ?? 0 };
+}
+
+/**
+ * Get a single dv_issue by (year, issue_number) — used by /dv/[slug] page.
+ * Returns null on miss or error so the page can call notFound().
+ */
+export async function getDvIssue(
+  year: number,
+  issue_number: number,
+): Promise<DvIssueRow | null> {
+  const { data, error } = await supabase
+    .from("dv_issues")
+    .select(
+      "id, issue_number, year, issue_supplement, date, title, source_url",
+    )
+    .eq("year", year)
+    .eq("issue_number", issue_number)
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !data) return null;
+
+  const { data: acts } = await supabase
+    .from("dv_acts")
+    .select("act_type")
+    .eq("issue_id", data.id);
+
+  const types = ((acts ?? []) as { act_type: string | null }[])
+    .map((a) => a.act_type)
+    .filter((t): t is string => !!t);
+  const freq = new Map<string, number>();
+  for (const t of types) freq.set(t, (freq.get(t) ?? 0) + 1);
+  const topTypes = [...freq.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map((e) => e[0]);
+
+  return {
+    ...data,
+    act_count: types.length,
+    top_act_types: topTypes,
+  };
+}
+
+/**
+ * List all acts in a given dv_issue, optionally filtered by act_type or
+ * local search (in-issue ILIKE per CONTEXT D-12).
+ *
+ * Returns [] on error (D-04 fallback).
+ */
+export async function listDvActs(opts: {
+  issue_id: string;
+  search?: string;
+  act_type?: string;
+}): Promise<DvActRow[]> {
+  let q = supabase
+    .from("dv_acts")
+    .select(
+      "id, issue_id, issue_number, year, act_number, title, act_type, full_text, source_url, razdel, summary_ai, summary_ai_generated_at",
+    )
+    .eq("issue_id", opts.issue_id)
+    .order("razdel", { ascending: true })
+    .order("title", { ascending: true });
+
+  if (opts.act_type) q = q.eq("act_type", opts.act_type);
+  if (opts.search && opts.search.trim().length >= 2) {
+    q = q.ilike("title", `%${opts.search.trim()}%`);
+  }
+
+  const { data, error } = await q;
+  if (error) {
+    console.error("[listDvActs] error", error);
+    return [];
+  }
+  return (data ?? []) as DvActRow[];
+}
