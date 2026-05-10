@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: milestone
-status: shipping
-last_updated: "2026-05-09T19:40:00Z"
-last_activity: 2026-05-09 -- Phase 01 shipped — PR #4 (preview green, MERGEABLE)
+status: discussing
+last_updated: "2026-05-10T10:30:00Z"
+last_activity: 2026-05-10 -- Phase 08 context gathered (19 decisions across DV-01 + DV-02; ready for /gsd-ui-phase 8)
 progress:
   total_phases: 11
   completed_phases: 1
@@ -20,14 +20,16 @@ progress:
 See: `.planning/PROJECT.md` (updated 2026-05-04)
 
 **Core value:** Every Bulgarian citizen can read, understand, and act on the law that affects them — without paying for a lawyer to translate it.
-**Current focus:** Phase 01 — reliability-observability
+**Current focus:** Phase 08 — dv-gazette (Държавен вестник scraper + browser); Phase 02 in flight on parallel branch (PR #5)
 
 ## Current Position
 
-Phase: 01 (reliability-observability) — SHIPPED (PR #4 open, all checks green, awaiting merge)
-Plan: 3 of 3 (Wave 1 finished — 01-01 streamed ingest in lex-brain, 01-02 rate-limit toast+log in lex-web)
-Status: PR #4 open against main — preview deploy READY, CodeRabbit pass, MERGEABLE; D-16 UAT items deferred to post-merge
-Last activity: 2026-05-09 -- Phase 01 shipped via PR #4 (https://github.com/SugarWork7788/lex-web/pull/4)
+Phase: 08 (dv-gazette) — DISCUSSING (CONTEXT.md + DISCUSSION-LOG.md written; 19 decisions D-01..D-19 locked across DV-01 scraper + DV-02 lex-web pages)
+Plan: 0 of TBD (plan count set during /gsd-plan-phase 8)
+Status: Ready for /gsd-ui-phase 8 (recommended given UI surface area: card grid listing + grouped-by-type detail + 5–6 act-type pills + inline AI summary expansion) then /gsd-plan-phase 8
+Last activity: 2026-05-10 -- Phase 08 context gathered via /gsd-discuss-phase
+
+Note: Phase 02 (PR #5) is still in flight on `feat/phase-02-ai-features`. Phase 08 forks off `main` and will rebase or merge in `main` once Phase 02 lands. Phase 08 will benefit from Phase 02's tsvector + recency-decay pattern + source-pill design tokens once those merge.
 
 Progress: ███░░░░░░░ 27%
 
