@@ -11,7 +11,7 @@ v2.2 — "Post-security-hardening release". Three phases that close the open aud
 - Decimal phases (e.g. 2.1): Urgent insertions (marked `INSERTED`)
 
 - [x] **Phase 1: Reliability & observability** — fix OpenSanctions OOM risk, surface rate-limit info in UI (3/3 plans complete)
-- [ ] **Phase 2: New AI features** — Intel search v2 + server-rendered Audit PDF
+- [x] **Phase 2: New AI features** — Intel search v2 + server-rendered Audit PDF (3/3 plans complete; verifier next)
 - [ ] **Phase 3: Mobile polish & CodeRabbit** — mobile UX pass + GitHub App install
 
 ## Phase Details
@@ -44,7 +44,7 @@ Plans:
 Plans:
 - [x] 02-01-PLAN.md — Supabase tsvector + GIN migration on the 6 intel tables + intel_search_top(q) ranking RPC; idempotent SQL + Node applier; [BLOCKING] live-DB push (✓ 2026-05-10, ~25 min, 1 deviation cycle: IMMUTABLE wrapper for array_to_string in GENERATED column)
 - [x] 02-02-PLAN.md — Intel ranking helper (lib/intel-search.ts) + <BestMatches>/<BestMatchCard>/<BestMatchQuote> UI per UI-SPEC + /api/intel/quote Haiku 4.5 streaming endpoint (✓ 2026-05-10, ~8 min, 3 auto-fix cycles; 31 vitest cases added; INT-02 closed)
-- [ ] 02-03-PLAN.md — /api/audit/pdf route (puppeteer-core + @sparticuz/chromium) + <DownloadPdfButton /> on /audit + next.config.ts outputFileTracingIncludes + engines.node ≥22.17.0
+- [x] 02-03-PLAN.md — /api/audit/pdf route (puppeteer-core + @sparticuz/chromium) + <DownloadPdfButton /> on /audit + next.config.ts outputFileTracingIncludes + engines.node ≥22.17.0 (✓ 2026-05-10, ~10 min, 2 auto-fix cycles: @sparticuz/chromium@148 API drift, Uint8Array→BodyInit TS variance; PDF-01 closed)
 
 ### Phase 3: Mobile polish & CodeRabbit
 **Goal**: Make the most-used pages comfortable on mobile and lock in PR-review automation.
@@ -89,7 +89,7 @@ All 6 v2.2 requirements mapped to a phase. ✓
 |------|--------|----------|-------|-------|-----------|
 | 02-01 | ✓ Complete | ~25 min | 3 + 1 deviation (Rule 1) | 4 (db/intel_fts.sql, scripts/apply-intel-fts.ts, package.json, bun.lock) | 2026-05-10 |
 | 02-02 | ✓ Complete | ~8 min | 3 + 3 auto-fix (Rule 1×2, Rule 3×1) | 9 (lib/intel-search.ts, app/api/intel/quote/route.ts, app/intel/search/{best-matches,best-match-card,best-match-quote}.tsx, app/intel/search/page.tsx, 3 test files) | 2026-05-10 |
-| 02-03 | ⏳ Ready (Wave 2) | — | — | — | — |
+| 02-03 | ✓ Complete | ~10 min | 3 + 2 auto-fix (Rule 1×2) | 6 (package.json, next.config.ts, app/api/audit/pdf/route.ts, app/audit/download-pdf-button.tsx, app/audit/page.tsx, __tests__/audit-pdf-route.test.ts) | 2026-05-10 |
 
 ---
 
@@ -218,4 +218,4 @@ Ideas captured during planning but not in the v2.2 milestone. Promote into a num
 
 ---
 *Roadmap created: 2026-05-04 (auto mode, derived from session context)*
-*Last updated: 2026-05-10 — Phase 2 plan 02-01 complete (Supabase tsvector + GIN migration applied to live DB; Wave 2 ready)*
+*Last updated: 2026-05-10 — Phase 2 implementation complete (3/3 plans; PDF-01 + INT-02 closed; verifier next)*

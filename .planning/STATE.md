@@ -84,6 +84,10 @@ Progress: █████░░░░░ 55%
 - **2026-05-10 (02-02)**: `lib/intel-search.ts` mirrors the SQL constants (`LEX_WEIGHT=0.7`, `RECENCY_WEIGHT=0.3`, `RECENCY_HALF_LIFE_DAYS=365`) for unit testing — keep both in sync if the SQL is retuned. The helper falls back to `[]` on RPC error/throw with `console.warn` so the page still renders the per-source breakdown if `intel_search_top` is missing on a staging DB.
 - **2026-05-10 (02-02)**: Anthropic SDK in test environments is mocked via `vi.mock("@anthropic-ai/sdk", ...)` returning a synthetic class with a stream handle that fires `text` deltas + `finalMessage()`. Lets routes assert on model identity, signal forwarding, and system-prompt content without live API access. Pattern reusable for future Anthropic-backed routes.
 - **2026-05-10 (02-02)**: `@testing-library/jest-dom` matchers (`toBeInTheDocument`) are NOT available in this vitest project (no setup file registered). Component tests use plain Vitest assertions (`toBeTruthy`, `not.toBeNull`, className regex matches). Avoids touching `vitest.config.ts`. If future plans want jest-dom matchers, add `setupFiles: ["@testing-library/jest-dom/vitest"]` and re-enable.
+- **2026-05-10 (02-03)**: `@sparticuz/chromium@148` removed `defaultViewport` and `headless` static getters from the class (only `args`, `setGraphicsMode`, `executablePath` remain). Canonical v148 launch shape per upstream README is literal viewport + `headless: "shell"` literal + `puppeteer.defaultArgs({args: chromium.args, headless: "shell"})` for arg composition. RESEARCH Pattern 4 referred to an older v141ish API. Future puppeteer-using routes must follow the v148 shape; plan-time research should always check `node_modules/@sparticuz/chromium/build/esm/index.d.ts` directly.
+- **2026-05-10 (02-03)**: `page.pdf()` returns `Uint8Array<ArrayBufferLike>`; DOM `BodyInit` requires an `ArrayBuffer`-backed Uint8Array under TypeScript strict (variance issue, not a real shape bug). Wrap puppeteer binary outputs in `Buffer.from(pdf)` before constructing a Response — Node Buffer extends `Uint8Array<ArrayBuffer>` and is V8 zero-copy share. Pattern reusable for any future binary-Response route that consumes puppeteer / sharp / similar Uint8Array<ArrayBufferLike> producers.
+- **2026-05-10 (02-03)**: Next 16 `outputFileTracingIncludes` is the TOP-LEVEL config key (NOT under `experimental.*` — that was the Next 14 placement; promoted to stable since v15). Verified against `node_modules/next/dist/docs/01-app/03-api-reference/05-config/01-next-config-js/output.md` line 90 per AGENTS.md "this is NOT the Next.js you know" mandate. Future plans that pin native binaries (sharp, ffmpeg, etc.) into the Vercel function bundle must use the same top-level shape, not `experimental`.
+- **2026-05-10 (02-03)**: NFT trace at `.next/server/app/api/audit/pdf/route.js.nft.json` contained 588 files including all 4 chromium brotli archives (al2023.tar.br, chromium.br, fonts.tar.br, swiftshader.tar.br) under the narrow `node_modules/@sparticuz/chromium/bin/**/*` glob. No widening to `lib/**/*` was required. RESEARCH Pitfall 3 fallback (widen the glob if Vercel deploy fails with "Could not find Chromium (rev. ...)") remains pre-emptively documented in `next.config.ts` for the first deploy.
 
 ### Milestone queue
 
@@ -104,10 +108,10 @@ Progress: █████░░░░░ 55%
 
 ### Last session
 
-- **Last session:** 2026-05-10T08:39:00Z — 2026-05-10T08:48:00Z (~8 min wall, 02-02 executed end-to-end including 3 auto-fix cycles)
-- **Stopped at:** 02-02 done — INT-02 closed: `lib/intel-search.ts` ranking helper + `/api/intel/quote` Haiku 4.5 streaming endpoint + `<BestMatches>` / `<BestMatchCard>` / `<BestMatchQuote>` UI components. 42/42 tests green; build green. 02-03 may still be in flight if a parallel agent is active (working-tree showed `app/audit/page.tsx` modified + `app/audit/download-pdf-button.tsx` untracked at end-of-plan, both 02-03 territory).
-- **Resume file:** None — if 02-03 is also done after this, run the phase verifier; if 02-03 is still in flight, wait for its completion before kicking off the verifier.
+- **Last session:** 2026-05-10T08:39:00Z — 2026-05-10T08:50:00Z (~10 min wall, 02-03 executed end-to-end including 2 auto-fix cycles; ran parallel with 02-02)
+- **Stopped at:** Phase 2 implementation complete — 02-03 done: PDF-01 closed via `/api/audit/pdf` route (puppeteer-core + @sparticuz/chromium) + `<DownloadPdfButton />` mounted on `/audit` stats row + Next 16 `outputFileTracingIncludes` pinning the chromium binary into the function bundle. NFT trace contains all 4 chromium brotli archives. 42/42 tests green; build green. Wave 2 parallel safety preserved (zero file overlap with 02-02; commits `8c9ea93/546216e/9fd586a` interleaved with 02-02's `dcc4f98/604db85/3ceadda`).
+- **Resume file:** None — Phase 2 implementation done. Next: `/gsd-verify-phase 2`.
 
 ---
 *State initialized: 2026-05-04*
-*Last plan complete: 2026-05-10 -- 02-02 (intel ranking helper + Haiku quote endpoint + best-matches UI; INT-02 closed)*
+*Last plan complete: 2026-05-10 -- 02-03 (audit PDF download via puppeteer + chromium; PDF-01 closed; Phase 2 implementation complete)*
