@@ -14,6 +14,7 @@ v2.2 — "Post-security-hardening release". Three phases that close the open aud
 - [x] **Phase 2: New AI features** — Intel search v2 + server-rendered Audit PDF (3/3 plans complete; verifier next)
 - [ ] **Phase 3: Mobile polish & CodeRabbit** — mobile UX pass + GitHub App install
 - [x] **Phase 8: Държавен вестник (State Gazette) browser** — JSF scraper + /dv UI + AI summary endpoint (3/3 plans complete; 2-year backfill deferred to post-merge)
+- [ ] **Phase 8.1: DV scraper navigation hotfix** [INSERTED 2026-05-11] — backfill produced 0 net rows + corrupted 9 issue shells; JSF idObj POST + pagination both broken; rewrite to stateless GET path
 
 ## Phase Details
 
