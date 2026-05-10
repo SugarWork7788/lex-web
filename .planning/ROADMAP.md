@@ -13,6 +13,7 @@ v2.2 — "Post-security-hardening release". Three phases that close the open aud
 - [x] **Phase 1: Reliability & observability** — fix OpenSanctions OOM risk, surface rate-limit info in UI (3/3 plans complete)
 - [ ] **Phase 2: New AI features** — Intel search v2 + server-rendered Audit PDF
 - [ ] **Phase 3: Mobile polish & CodeRabbit** — mobile UX pass + GitHub App install
+- [x] **Phase 8: Държавен вестник (State Gazette) browser** — JSF scraper + /dv UI + AI summary endpoint (3/3 plans complete; 2-year backfill deferred to post-merge)
 
 ## Phase Details
 
@@ -56,12 +57,16 @@ Plans:
   2. `/dv` lists issues with number, date, count of acts; pagination works; results render in <2 s for the listing page.
   3. `/dv/[issue]` shows all acts in one issue with title, type, and link to the original `dv.parliament.bg` source; per-act AI summary is reachable via a button (or inline streaming card).
   4. "Държавен вестник" link is visible in the main nav.
-**Plans**: TBD (set during /gsd-plan-phase 8)
+**Plans**: 3 plans (3 complete; 2 waves)
 
 Plans:
-- [ ] 08-NN: TBD — set during plan-phase
+- [x] 08-01-PLAN.md — Wave 1: Supabase tsvector + GIN + dv_search_top RPC migration (lex-web) + lex-brain JSF scraper for dv.parliament.bg with 16-test helper module + 7-step walk algorithm. **Includes 2 BLOCKING checkpoints** (live DB push, live-net scraper smoke against issue 2026/42 — both passed). (✓ 2026-05-10; smoke = 10 acts, 0 jsessionid leaks, 0 missing bodies)
+- [x] 08-02-PLAN.md — Wave 2: lex-web `/dv` listing + `/dv/[slug]` detail + queries layer + nav link + DV_ACT_PILL design token. 36 new vitest cases. (✓ 2026-05-11; 44/44 tests in worktree, 55/55 after merge with 08-03)
+- [x] 08-03-PLAN.md — Wave 2 (parallel-safe with 08-02): `/api/dv/summarize` Anthropic Sonnet 4.6 streaming endpoint with rate-limit, signal-cancellation, write-back-after-loop cache invariant (NEVER in finally). 11 vitest cases incl. abort-no-poison. (✓ 2026-05-11)
 
 **UI hint**: yes (listing page + issue detail + nav addition)
+
+**Post-merge deferred:** the full 2-year backfill in lex-brain (~10,000 rows × 1.5 s polite delay ≈ 2–3 h). Recipe in 08-01-SUMMARY.md.
 
 ### Phase 3: Mobile polish & CodeRabbit
 **Goal**: Make the most-used pages comfortable on mobile and lock in PR-review automation.
