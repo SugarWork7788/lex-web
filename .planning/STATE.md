@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: milestone
-status: planned
-last_updated: "2026-05-10T08:50:00Z"
-last_activity: 2026-05-10 -- 02-03 complete — PDF-01 closed (puppeteer-core + @sparticuz/chromium PDF route + DownloadPdfButton + Wave 2 parallel done)
+status: shipping
+last_updated: "2026-05-10T09:30:00Z"
+last_activity: 2026-05-10 -- Phase 02 shipped — PR #5 (preview green, MERGEABLE)
 progress:
   total_phases: 11
-  completed_phases: 1
-  total_plans: 4
+  completed_phases: 2
+  total_plans: 6
   completed_plans: 6
   percent: 55
 ---
@@ -24,10 +24,10 @@ See: `.planning/PROJECT.md` (updated 2026-05-04)
 
 ## Current Position
 
-Phase: 02 (new-ai-features) — IMPLEMENTATION COMPLETE (3/3 plans done)
-Plan: 3 of 3 (02-01 ✓ + 02-02 ✓ + 02-03 ✓ — Wave 2 parallel done; PDF-01 closed)
-Status: Phase 2 implementation complete; verifier next (`/gsd-verify-phase 2`)
-Last activity: 2026-05-10 -- 02-03 executed: 3 tasks committed (8c9ea93 deps+config, 546216e route+smoke test, 9fd586a button+page); 42/42 vitest cases green; bun run build green; NFT trace contains all 4 chromium brotli archives
+Phase: 02 (new-ai-features) — SHIPPED (PR #5 open, Vercel preview green, CodeRabbit pending, MERGEABLE)
+Plan: 3 of 3 (02-01 ✓ + 02-02 ✓ + 02-03 ✓ — Wave 2 parallel done; PDF-01 + INT-02 closed)
+Status: PR #5 open against main — preview deploy READY, MERGEABLE; 6 manual UAT items deferred to preview verification before merge
+Last activity: 2026-05-10 -- Phase 02 shipped via PR #5 (https://github.com/SugarWork7788/lex-web/pull/5)
 
 Progress: █████░░░░░ 55%
 
