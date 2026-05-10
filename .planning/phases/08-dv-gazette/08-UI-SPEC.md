@@ -1,10 +1,11 @@
 ---
 phase: 8
 slug: dv-gazette
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-05-10
+reviewed_at: 2026-05-10
 inherits_from: phase-02 (tokens locked on parallel branch feat/phase-02-ai-features)
 ---
 
@@ -660,14 +661,14 @@ This contract was assembled from:
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: PASS
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS (FLAG: 6 sizes / 3 weights — all inherited from Phase 2, zero new tokens introduced)
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved 2026-05-10
 
 ---
 

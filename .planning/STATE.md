@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v2.2
 milestone_name: milestone
-status: discussing
-last_updated: "2026-05-10T10:30:00Z"
-last_activity: 2026-05-10 -- Phase 08 context gathered (19 decisions across DV-01 + DV-02; ready for /gsd-ui-phase 8)
+status: ui-approved
+last_updated: "2026-05-10T11:15:00Z"
+last_activity: 2026-05-10 -- Phase 08 UI-SPEC approved (6/6 dimensions PASS; ready for /gsd-plan-phase 8)
 progress:
   total_phases: 11
   completed_phases: 1
@@ -24,10 +24,10 @@ See: `.planning/PROJECT.md` (updated 2026-05-04)
 
 ## Current Position
 
-Phase: 08 (dv-gazette) — DISCUSSING (CONTEXT.md + DISCUSSION-LOG.md written; 19 decisions D-01..D-19 locked across DV-01 scraper + DV-02 lex-web pages)
+Phase: 08 (dv-gazette) — UI APPROVED (CONTEXT.md + UI-SPEC.md written; 19 locked decisions + 6/6 design dimensions PASS; component inventory: 7 new files mapped)
 Plan: 0 of TBD (plan count set during /gsd-plan-phase 8)
-Status: Ready for /gsd-ui-phase 8 (recommended given UI surface area: card grid listing + grouped-by-type detail + 5–6 act-type pills + inline AI summary expansion) then /gsd-plan-phase 8
-Last activity: 2026-05-10 -- Phase 08 context gathered via /gsd-discuss-phase
+Status: Ready for /gsd-plan-phase 8 (4 non-blocking FLAGs from ui-checker for planner to fold in: typography size count vs strict policy, regenerate-button TBD, mobile filter density UAT, footer border opacity deviation)
+Last activity: 2026-05-10 -- Phase 08 UI-SPEC approved (6/6 dimensions PASS, 4 non-blocking FLAGs surfaced)
 
 Note: Phase 02 (PR #5) is still in flight on `feat/phase-02-ai-features`. Phase 08 forks off `main` and will rebase or merge in `main` once Phase 02 lands. Phase 08 will benefit from Phase 02's tsvector + recency-decay pattern + source-pill design tokens once those merge.
 
