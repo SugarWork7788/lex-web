@@ -149,7 +149,7 @@ Add user authentication to lex-web using Supabase Auth (already in stack). Email
 
 ## Phases
 
-- [ ] **Phase 4: Auth foundation** — Supabase Auth + email/password + Google OAuth + user_profiles + sign-in UI
+- [x] **Phase 4: Auth foundation** — Supabase Auth + email/password + Google OAuth + user_profiles + sign-in UI + /profile page + 30 Bulgarian historical avatars (3/3 plans complete; verifier PASS-WITH-DEFERRED-UAT for Smokes 2+4)
 - [ ] **Phase 5: Auth middleware** — Next.js middleware, protected-route helper, server-side session util
 - [ ] **Phase 6: Page gating** — gate /audit voting + /intel; anonymous still sees /audit content
 - [ ] **Phase 7: Premium hooks** — tier column + useUserTier hook + one example premium-gated feature (no Stripe)
@@ -165,13 +165,12 @@ Add user authentication to lex-web using Supabase Auth (already in stack). Email
   2. A new user can sign in with Google OAuth and a `user_profiles` row is created on first sign-in.
   3. Sign-out clears the session and the UI reflects anonymous state.
   4. `user_profiles` table has RLS enforcing "users can only read/update their own row".
-**Plans**: 4 plans
+**Plans**: 3 plans (collapsed from 4 per planner's call — 04-04 `getSession()` + `useSession()` merge into 04-02 because they share `lib/supabase-auth.ts` + the same vitest mocks; splitting added zero parallelism). Wave 1 = 04-01 (DB), Wave 2 = 04-02 (auth client), Wave 3 = 04-03 (UI). Strictly sequential — DB precondition for client; client precondition for UI. 2 BLOCKING checkpoints (04-01 live-DB push + 04-03 Google OAuth manual smoke) plus 1 BLOCKING human-action (pre-implementation operator checklist at top of 04-01).
 
 Plans:
-- [ ] 04-01: Configure Supabase Auth provider in `lib/supabase.ts` (server + client variants); add Google OAuth credentials to env
-- [ ] 04-02: Create `user_profiles` table (id pk = auth.users.id, display_name, locale, created_at) + RLS policies; ship as a migration block in `db/`-adjacent SQL
-- [ ] 04-03: Sign-in / sign-up / sign-out pages (Bulgarian) with Supabase Auth UI or hand-rolled form
-- [ ] 04-04: `getSession()` server util (Server Component & Route Handler), `useSession()` client hook
+- [ ] 04-01-PLAN.md — Wave 1: `db/auth_schema.sql` (user_profiles + RLS + hardened SECURITY DEFINER trigger with `SET search_path = public`) + `scripts/apply-auth-schema.ts` applier + `bun run db:auth-schema` script + pre-implementation operator checklist (Supabase + Google dashboard config) + BLOCKING live-DB push
+- [ ] 04-02-PLAN.md — Wave 2: `bun add @supabase/ssr@^0.10.3` + `lib/supabase-auth.ts` (3 factories + `getSession()` server util using `getUser()` per Pitfall 5) + `lib/use-session.ts` client hook + `app/auth/callback/route.ts` (with open-redirect guard `if (!next.startsWith("/")) next = "/"` per Pitfall 3) + `app/api/auth/sign-out/route.ts` (rate-limited via existing `lib/rate-limit.ts`) + 4 vitest files (~17 cases)
+- [ ] 04-03-PLAN.md — Wave 3: `/sign-in` + `/sign-up` + `/sign-up/check-email` Server Component pages + hand-rolled Bulgarian forms (D-01, D-10) reusing `alert-form.tsx` state-machine pattern + `<AuthNavLink>` client component appended to `app/layout.tsx` (D-09 right-aligned `hover:underline underline-offset-4`) + 3 vitest files (13 cases) + BLOCKING manual smoke (Google OAuth consent + email signup + open-redirect guard + sign-out + anonymous-vote regression check per Q5)
 
 ### Phase 5: Auth middleware + protected route system
 **Goal**: Next.js middleware enforces auth on routes that opt in; clean redirect-to-sign-in with returnTo preserves UX.
@@ -203,6 +202,14 @@ Plans:
 - [ ] 06-01: Gate the `<VoteButton>` component — anonymous variant + authed variant; update `/api/audit/vote` to require session and record `user_id`
 - [ ] 06-02: Add `/intel/*` to the protected-routes set in middleware
 - [ ] 06-03: `/account` page with profile view + sign-out
+
+#### Backlog (post-initial-cut, captured 2026-05-11)
+
+- [ ] **Favorites / Saved items system** (FAV-01..FAV-06) — user can save any of: Laws (`/laws/[slug]`), Court decisions (`/courts/[court]/[id]`), EU regulations (`/eu/[celex]`), Audit findings (`/audit/finding/[id]`), DV acts (`/dv/[issue]`), Intel entities (`/intel/sanctions`, `/intel/offshore`).
+  - DB: `user_saved_items (id, user_id, item_type, item_id, item_slug, item_title, saved_at)` + RLS policies (users read/write own rows only).
+  - Bookmark icon (🔖) on every item card/page — filled when saved, outline when not. Toggle on click. Anonymous users see a "Sign in to save" prompt that links to `/sign-in?returnTo=…` (mirrors `<VoteButton>` anonymous variant from 06-01).
+  - `/profile/saved` page listing all saved items grouped by type, with type-filter chips (Закони / Решения / ЕС / Одит / ДВ / Разузнаване) and in-list search.
+  - **Scope concern:** This is substantial — DB schema, 6 page surfaces with bookmark UI, 1 new aggregate page with filters + search, anonymous-prompt UX. Likely justifies splitting Phase 6 into 6.1 (gating, current 3 plans) and 6.2 (favorites, ~4 new plans). Decide at `/gsd-discuss-phase 6` time.
 
 ### Phase 7: Premium tier hooks
 **Goal**: `user_profiles` has a `tier` enum, `useUserTier()` exists for client and server, and one minimal premium-gated capability is wired to prove the path. Stripe / billing explicitly out of scope.
@@ -264,4 +271,4 @@ Ideas captured during planning but not in the v2.2 milestone. Promote into a num
 
 ---
 *Roadmap created: 2026-05-04 (auto mode, derived from session context)*
-*Last updated: 2026-05-11 — Phase 8.1 inserted (1 plan, 4 tasks, 2 BLOCKING checkpoints; addresses Phase 8 backfill failure)*
+*Last updated: 2026-05-11 — Phase 4 planned (3 plans, 9 tasks, 3 BLOCKING gates: operator checklist + live-DB push + OAuth/email smoke; opens v2.3 milestone)*

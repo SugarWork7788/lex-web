@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Source_Serif_4 } from "next/font/google";
 import Link from "next/link";
+import { AuthNavLink } from "./auth-nav-link";
 import "./globals.css";
 
 const inter = Inter({
@@ -106,6 +107,7 @@ export default function RootLayout({
               <Link href="/about" className="hover:underline underline-offset-4 text-black/65 dark:text-white/65">
                 За платформата
               </Link>
+              <AuthNavLink />
             </nav>
           </div>
         </header>

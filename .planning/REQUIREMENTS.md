@@ -111,6 +111,15 @@ Promoted from backlog 2026-05-05. New milestone after v2.2. Reverses the prior "
 - [ ] **AUTH-10**: Anonymous users still see `/audit` finding content (vote button shows "Sign in to vote")
 - [ ] **AUTH-11**: `/account` page exists — profile view + sign-out
 
+### Favorites / Saved items (Phase 6 backlog — captured 2026-05-11)
+
+- [ ] **FAV-01**: `user_saved_items` table exists `(id uuid pk, user_id uuid → auth.users, item_type text, item_id text, item_slug text, item_title text, saved_at timestamptz)` with RLS — users can read/insert/delete their own rows only; UNIQUE `(user_id, item_type, item_id)`
+- [ ] **FAV-02**: Bookmark UI (🔖 filled/outline) appears on every item surface across 6 entity types: Laws (`/laws/[slug]`), Court decisions (`/courts/[court]/[id]`), EU regulations (`/eu/[celex]`), Audit findings (`/audit/finding/[id]`), DV acts (`/dv/[issue]`), Intel entities (`/intel/sanctions`, `/intel/offshore`)
+- [ ] **FAV-03**: Click toggles save/unsave; optimistic update in UI; rollback on error; one round-trip per toggle
+- [ ] **FAV-04**: Anonymous users see "Sign in to save" prompt linking to `/sign-in?returnTo=…` — mirrors `<VoteButton>` anonymous variant from AUTH-10
+- [ ] **FAV-05**: `/profile/saved` page lists all saved items grouped by type, with type-filter chips (Закони / Решения / ЕС / Одит / ДВ / Разузнаване) defaulting to "All"
+- [ ] **FAV-06**: In-list search box on `/profile/saved` filters by `item_title` substring (case-insensitive, Cyrillic-aware)
+
 ### Premium tier hooks
 
 - [ ] **AUTH-12**: `user_profiles.tier` enum (`free`, `premium`) added; existing rows backfilled to `free`
@@ -174,11 +183,18 @@ These were captured during planning but not in the v2.2 or v2.3 milestones. See 
 | AUTH-12 | Phase 7 | Pending |
 | AUTH-13 | Phase 7 | Pending |
 | AUTH-14 | Phase 7 | Pending |
+| FAV-01 | Phase 6 (backlog) | Pending |
+| FAV-02 | Phase 6 (backlog) | Pending |
+| FAV-03 | Phase 6 (backlog) | Pending |
+| FAV-04 | Phase 6 (backlog) | Pending |
+| FAV-05 | Phase 6 (backlog) | Pending |
+| FAV-06 | Phase 6 (backlog) | Pending |
 
 **Coverage (v2.3):**
-- v2.3 requirements: 14 total
-- Mapped to phases: 14
+- v2.3 requirements: 20 total (14 AUTH + 6 FAV)
+- Mapped to phases: 20
 - Unmapped: 0 ✓
+- **Note:** FAV-01..FAV-06 are Phase 6 *backlog* — captured but not yet committed to plan-phase scope. Likely justifies splitting Phase 6 into 6.1 (gating) and 6.2 (favorites) when discuss-phase runs. See ROADMAP.md §"Phase 6 / Backlog (post-initial-cut)".
 
 ---
 *Requirements defined: 2026-05-04 (auto mode, brownfield from session context)*
