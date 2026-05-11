@@ -14,21 +14,70 @@
 
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import {
+  DEFAULT_AVATAR_ID,
+  GOOGLE_AVATAR_ID,
+  getAvatarById,
+} from "@/lib/avatars";
+import { createBrowserSupabase } from "@/lib/supabase-browser";
 import { useSession } from "@/lib/use-session";
 
+// Renders a tiny circular avatar + "Профил" when signed in.
+// Avatar source priority:
+//   1. user_profiles.avatar_id ('google' → user.user_metadata.avatar_url; preset id → /avatars/{id}.png)
+//   2. DEFAULT_AVATAR_ID
+// Fetches avatar_id once per session via supabase.from('user_profiles')
+// (anon-key client; RLS lets users read their own row).
 export function AuthNavLink() {
   const { user, loading } = useSession();
+  const [avatarId, setAvatarId] = useState<string>(DEFAULT_AVATAR_ID);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    const supabase = createBrowserSupabase();
+    supabase
+      .from("user_profiles")
+      .select("avatar_id")
+      .eq("id", user.id)
+      .single()
+      .then(({ data }) => {
+        if (cancelled) return;
+        setAvatarId(data?.avatar_id ?? DEFAULT_AVATAR_ID);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   if (loading) return null;
 
   if (user) {
+    const googleUrl =
+      (user.user_metadata as { avatar_url?: string } | undefined)?.avatar_url ?? null;
+    const useGoogle = avatarId === GOOGLE_AVATAR_ID && googleUrl;
+    const presetSrc = getAvatarById(avatarId).file;
+    const src = useGoogle ? googleUrl : presetSrc;
+
     return (
       <Link
         href="/profile"
-        className="hover:underline underline-offset-4"
+        className="flex items-center gap-2 hover:underline underline-offset-4"
       >
-        Профил
+        <span className="relative h-6 w-6 overflow-hidden rounded-full ring-1 ring-stone-300 dark:ring-stone-700">
+          <Image
+            src={src}
+            alt=""
+            fill
+            sizes="24px"
+            unoptimized={Boolean(useGoogle)}
+            className="object-cover"
+          />
+        </span>
+        <span>Профил</span>
       </Link>
     );
   }

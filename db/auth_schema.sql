@@ -40,3 +40,9 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION handle_new_user();
+
+-- Avatar selection: preset Bulgarian historical figures.
+-- Default 'asparuh' (Hahn Asparuh, founder of Bulgaria 681 AD).
+-- Special value 'google' means "use raw_user_meta_data.avatar_url from
+-- auth.users (Google profile photo)". UI reads lib/avatars.ts for the file map.
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS avatar_id text DEFAULT 'asparuh';

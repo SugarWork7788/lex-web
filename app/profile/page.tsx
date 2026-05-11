@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
+import { DEFAULT_AVATAR_ID } from "@/lib/avatars";
 import { createServerSupabase, getSession } from "@/lib/supabase-auth";
+import { AvatarPicker } from "./avatar-picker";
 import { ProfileSignOutButton } from "./sign-out-button";
 
 // Bulgarian-locale + Sofia TZ formatter — matches /dv pages convention.
@@ -19,12 +21,15 @@ export default async function ProfilePage() {
   const supabase = await createServerSupabase();
   const { data: profile } = await supabase
     .from("user_profiles")
-    .select("display_name, created_at")
+    .select("display_name, created_at, avatar_id")
     .eq("id", user.id)
     .single();
 
   const displayName = profile?.display_name ?? user.email?.split("@")[0] ?? "Анонимен";
   const createdAt = profile?.created_at ?? user.created_at;
+  const avatarId = profile?.avatar_id ?? DEFAULT_AVATAR_ID;
+  const googleAvatarUrl =
+    (user.user_metadata as { avatar_url?: string } | undefined)?.avatar_url ?? null;
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-12">
@@ -61,6 +66,8 @@ export default async function ProfilePage() {
           </dd>
         </div>
       </dl>
+
+      <AvatarPicker initialAvatarId={avatarId} googleAvatarUrl={googleAvatarUrl} />
 
       <div className="mt-8 flex justify-end">
         <ProfileSignOutButton />

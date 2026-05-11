@@ -63,6 +63,11 @@ async function main() {
       query: `SELECT tgname FROM pg_trigger WHERE tgname='on_auth_user_created' AND tgrelid='auth.users'::regclass`,
       expect: 1,
     },
+    {
+      name: "user_profiles.avatar_id column exists with default 'asparuh'",
+      query: `SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='user_profiles' AND column_name='avatar_id' AND column_default LIKE '%asparuh%'`,
+      expect: 1,
+    },
   ];
 
   for (const probe of probes) {
