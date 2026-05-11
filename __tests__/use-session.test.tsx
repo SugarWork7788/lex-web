@@ -13,7 +13,7 @@ const getSessionMock = vi.fn();
 const onAuthStateChangeMock = vi.fn();
 const unsubscribeMock = vi.fn();
 
-vi.mock("@/lib/supabase-auth", () => ({
+vi.mock("@/lib/supabase-browser", () => ({
   createBrowserSupabase: () => ({
     auth: {
       getSession: getSessionMock,

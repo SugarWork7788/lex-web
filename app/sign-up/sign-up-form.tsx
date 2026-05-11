@@ -11,7 +11,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { createBrowserSupabase } from "@/lib/supabase-auth";
+import { createBrowserSupabase } from "@/lib/supabase-browser";
 
 type Status = "idle" | "submitting" | "ok" | "error";
 

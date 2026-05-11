@@ -14,7 +14,7 @@ const { signUpMock, pushMock } = vi.hoisted(() => ({
   pushMock: vi.fn(),
 }));
 
-vi.mock("@/lib/supabase-auth", () => ({
+vi.mock("@/lib/supabase-browser", () => ({
   createBrowserSupabase: () => ({
     auth: { signUp: signUpMock },
   }),

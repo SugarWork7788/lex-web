@@ -9,7 +9,7 @@
 
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
-import { createBrowserSupabase } from "@/lib/supabase-auth";
+import { createBrowserSupabase } from "@/lib/supabase-browser";
 
 export function useSession(): { user: User | null; loading: boolean } {
   const [user, setUser] = useState<User | null>(null);
