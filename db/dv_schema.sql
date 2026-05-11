@@ -48,6 +48,12 @@ ALTER TABLE dv_issues ADD COLUMN IF NOT EXISTS search_vector tsvector
 
 CREATE INDEX IF NOT EXISTS dv_issues_fts ON dv_issues USING gin(search_vector);
 
+-- 2a. FK index for dv_acts.issue_id (Phase 8.1 — added per RESEARCH §Q4 caveat).
+-- Postgres does NOT auto-index FOREIGN KEY columns. The refetch predicate's
+-- LEFT JOIN dv_issues × dv_acts uses a Seq Scan on dv_acts without this; at
+-- ~120K acts after the 2-year backfill that becomes painful.
+CREATE INDEX IF NOT EXISTS dv_acts_issue_id_idx ON dv_acts(issue_id);
+
 -- 3. Ranking RPC (mirrors Phase 2's intel_search_top blend 0.7 ts_rank + 0.3 recency_decay, half-life 365 days):
 CREATE OR REPLACE FUNCTION dv_search_top(
   q text,
