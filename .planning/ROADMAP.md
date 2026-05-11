@@ -149,7 +149,7 @@ Add user authentication to lex-web using Supabase Auth (already in stack). Email
 
 ## Phases
 
-- [ ] **Phase 4: Auth foundation** — Supabase Auth + email/password + Google OAuth + user_profiles + sign-in UI
+- [x] **Phase 4: Auth foundation** — Supabase Auth + email/password + Google OAuth + user_profiles + sign-in UI + /profile page + 30 Bulgarian historical avatars (3/3 plans complete; verifier PASS-WITH-DEFERRED-UAT for Smokes 2+4)
 - [ ] **Phase 5: Auth middleware** — Next.js middleware, protected-route helper, server-side session util
 - [ ] **Phase 6: Page gating** — gate /audit voting + /intel; anonymous still sees /audit content
 - [ ] **Phase 7: Premium hooks** — tier column + useUserTier hook + one example premium-gated feature (no Stripe)

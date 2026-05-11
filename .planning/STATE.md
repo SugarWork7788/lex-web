@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.2
-milestone_name: milestone
+milestone: v2.3
+milestone_name: Auth & Premium hooks
 status: in_progress
-last_updated: "2026-05-11T02:50:00Z"
-last_activity: 2026-05-11 -- Phase 8.1 hotfix complete (stateless GET rewrite + 9 corrupt shells repaired); full backfill running (PID 94740).
+last_updated: "2026-05-11T19:30:00Z"
+last_activity: 2026-05-11 -- Phase 4 (Auth foundation, first phase of v2.3) verified PASS-WITH-DEFERRED-UAT; ready for /gsd-ship.
 progress:
   total_phases: 11
-  completed_phases: 4
-  total_plans: 10
-  completed_plans: 10
-  percent: 80
+  completed_phases: 5
+  total_plans: 13
+  completed_plans: 13
+  percent: 85
 ---
 
 # Project State
