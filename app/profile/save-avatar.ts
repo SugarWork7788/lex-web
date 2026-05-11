@@ -1,16 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { isValidAvatarId } from "@/lib/avatars";
 import { createServerSupabase, getSession } from "@/lib/supabase-auth";
-import { GOOGLE_AVATAR_ID, PRESET_AVATARS } from "@/lib/avatars";
-
-const VALID_IDS = new Set<string>([
-  ...PRESET_AVATARS.map((a) => a.id),
-  GOOGLE_AVATAR_ID,
-]);
 
 export async function saveAvatar(avatarId: string): Promise<{ ok: boolean; error?: string }> {
-  if (!VALID_IDS.has(avatarId)) {
+  if (!isValidAvatarId(avatarId)) {
     return { ok: false, error: "Невалиден аватар" };
   }
 

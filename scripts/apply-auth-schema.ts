@@ -64,8 +64,8 @@ async function main() {
       expect: 1,
     },
     {
-      name: "user_profiles.avatar_id column exists with default 'asparuh'",
-      query: `SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='user_profiles' AND column_name='avatar_id' AND column_default LIKE '%asparuh%'`,
+      name: "user_profiles.avatar_id column exists with default 'initials'",
+      query: `SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='user_profiles' AND column_name='avatar_id' AND column_default LIKE '%initials%'`,
       expect: 1,
     },
   ];

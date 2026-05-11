@@ -67,7 +67,12 @@ export default async function ProfilePage() {
         </div>
       </dl>
 
-      <AvatarPicker initialAvatarId={avatarId} googleAvatarUrl={googleAvatarUrl} />
+      <AvatarPicker
+        userId={user.id}
+        displayName={displayName}
+        initialAvatarId={avatarId}
+        googleAvatarUrl={googleAvatarUrl}
+      />
 
       <div className="mt-8 flex justify-end">
         <ProfileSignOutButton />
