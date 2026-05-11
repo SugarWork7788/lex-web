@@ -62,7 +62,6 @@ export function AvatarPicker({
         <Tile
           id={INITIALS_AVATAR_ID}
           name="Инициали"
-          description="Цветен кръг с първата буква от вашето име"
           selected={selected === INITIALS_AVATAR_ID}
           onSelect={setSelected}
         >
@@ -73,7 +72,6 @@ export function AvatarPicker({
           <Tile
             id={GOOGLE_AVATAR_ID}
             name="Google профил"
-            description="Снимка от Google акаунт"
             selected={selected === GOOGLE_AVATAR_ID}
             onSelect={setSelected}
           >
@@ -84,6 +82,7 @@ export function AvatarPicker({
                 fill
                 sizes="80px"
                 unoptimized
+                title="Google профил"
                 className="object-cover"
               />
             </span>
@@ -95,7 +94,6 @@ export function AvatarPicker({
             key={a.id}
             id={a.id}
             name={a.name}
-            description={a.description}
             selected={selected === a.id}
             onSelect={setSelected}
           >
@@ -105,6 +103,7 @@ export function AvatarPicker({
                 alt=""
                 fill
                 sizes="80px"
+                title={a.name}
                 className="object-cover"
               />
             </span>
@@ -130,14 +129,12 @@ export function AvatarPicker({
 function Tile({
   id,
   name,
-  description,
   selected,
   onSelect,
   children,
 }: {
   id: string;
   name: string;
-  description: string;
   selected: boolean;
   onSelect: (id: string) => void;
   children: React.ReactNode;
@@ -147,17 +144,14 @@ function Tile({
       type="button"
       onClick={() => onSelect(id)}
       aria-pressed={selected}
-      title={`${name} — ${description}`}
-      className={`group flex flex-col items-center rounded-lg border-2 p-2 transition-all ${
+      aria-label={name}
+      className={`group flex items-center justify-center rounded-lg border-2 p-2 transition-all ${
         selected
           ? "border-red-700 bg-red-50 dark:border-red-400 dark:bg-red-950/40"
           : "border-stone-200 bg-white hover:border-stone-400 dark:border-stone-800 dark:bg-stone-900/40 dark:hover:border-stone-600"
       }`}
     >
       {children}
-      <span className="mt-2 text-center text-xs text-stone-700 dark:text-stone-300">
-        {name}
-      </span>
     </button>
   );
 }
