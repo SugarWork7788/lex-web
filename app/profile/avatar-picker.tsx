@@ -2,16 +2,17 @@
 
 import Image from "next/image";
 import { useState, useTransition } from "react";
-import { DEFAULT_AVATAR_ID, GOOGLE_AVATAR_ID } from "@/lib/avatars";
+import {
+  GOOGLE_AVATAR_ID,
+  INITIALS_AVATAR_ID,
+  PRESET_AVATARS,
+} from "@/lib/avatars";
 import { InitialsAvatar } from "../_components/initials-avatar";
 import { saveAvatar } from "./save-avatar";
 
-// Two options today:
-//   - 'initials' (default) — colored circle with first letter of display_name
-//   - 'google' (optional)  — Google profile photo, only if signed in via OAuth
-//
-// The preset PNG grid was removed (commit history: image/name mismatch).
-// Future: re-introduce a curated registry once URL→figure mapping is verified.
+// Avatar picker: initials (default) + Google profile photo (if OAuth) + 35
+// Bulgarian historical-figure preset PNGs. All tiles share the same 80px
+// circular footprint so the grid stays visually consistent.
 
 export function AvatarPicker({
   userId,
@@ -50,19 +51,19 @@ export function AvatarPicker({
         id="avatar-heading"
         className="font-serif text-2xl font-bold text-stone-900 dark:text-stone-100"
       >
-        Аватар
+        Изберете аватар
       </h2>
       <p className="mt-1 text-sm text-stone-600 dark:text-stone-400">
-        {googleAvatarUrl
-          ? "Изберете между инициали (по подразбиране) или вашата Google профилна снимка."
-          : "Цветен кръг с първата буква от вашето име. Постоянен цвят за вашия акаунт."}
+        Инициали (по подразбиране), Google профилна снимка или историческа
+        фигура от българската история. Може да се промени по всяко време.
       </p>
 
-      <div className="mt-6 grid grid-cols-2 gap-4 sm:max-w-md">
+      <div className="mt-6 grid grid-cols-3 gap-4 sm:grid-cols-4 md:grid-cols-5">
         <Tile
-          id={DEFAULT_AVATAR_ID}
-          label="Инициали"
-          selected={selected === DEFAULT_AVATAR_ID}
+          id={INITIALS_AVATAR_ID}
+          name="Инициали"
+          description="Цветен кръг с първата буква от вашето име"
+          selected={selected === INITIALS_AVATAR_ID}
           onSelect={setSelected}
         >
           <InitialsAvatar userId={userId} displayName={displayName} size={80} />
@@ -71,11 +72,12 @@ export function AvatarPicker({
         {googleAvatarUrl && (
           <Tile
             id={GOOGLE_AVATAR_ID}
-            label="Google профил"
+            name="Google профил"
+            description="Снимка от Google акаунт"
             selected={selected === GOOGLE_AVATAR_ID}
             onSelect={setSelected}
           >
-            <span className="relative h-20 w-20 overflow-hidden rounded-full ring-1 ring-stone-300 dark:ring-stone-700">
+            <span className="relative inline-block h-20 w-20 overflow-hidden rounded-full ring-1 ring-stone-300 dark:ring-stone-700">
               <Image
                 src={googleAvatarUrl}
                 alt=""
@@ -87,6 +89,27 @@ export function AvatarPicker({
             </span>
           </Tile>
         )}
+
+        {PRESET_AVATARS.map((a) => (
+          <Tile
+            key={a.id}
+            id={a.id}
+            name={a.name}
+            description={a.description}
+            selected={selected === a.id}
+            onSelect={setSelected}
+          >
+            <span className="relative inline-block h-20 w-20 overflow-hidden rounded-full ring-1 ring-stone-300 dark:ring-stone-700">
+              <Image
+                src={a.file}
+                alt=""
+                fill
+                sizes="80px"
+                className="object-cover"
+              />
+            </span>
+          </Tile>
+        ))}
       </div>
 
       <div className="mt-6 flex items-center justify-end gap-3">
@@ -106,13 +129,15 @@ export function AvatarPicker({
 
 function Tile({
   id,
-  label,
+  name,
+  description,
   selected,
   onSelect,
   children,
 }: {
   id: string;
-  label: string;
+  name: string;
+  description: string;
   selected: boolean;
   onSelect: (id: string) => void;
   children: React.ReactNode;
@@ -122,15 +147,16 @@ function Tile({
       type="button"
       onClick={() => onSelect(id)}
       aria-pressed={selected}
-      className={`group flex flex-col items-center rounded-lg border-2 p-4 transition-all ${
+      title={`${name} — ${description}`}
+      className={`group flex flex-col items-center rounded-lg border-2 p-2 transition-all ${
         selected
           ? "border-red-700 bg-red-50 dark:border-red-400 dark:bg-red-950/40"
           : "border-stone-200 bg-white hover:border-stone-400 dark:border-stone-800 dark:bg-stone-900/40 dark:hover:border-stone-600"
       }`}
     >
       {children}
-      <span className="mt-3 text-sm text-stone-700 dark:text-stone-300">
-        {label}
+      <span className="mt-2 text-center text-xs text-stone-700 dark:text-stone-300">
+        {name}
       </span>
     </button>
   );

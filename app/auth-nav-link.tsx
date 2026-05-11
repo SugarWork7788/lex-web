@@ -4,15 +4,16 @@
 // "Влез" anonymous → /sign-in. "Профил" + tiny avatar signed-in → /profile.
 //
 // Avatar source priority:
-//   1. user_profiles.avatar_id === 'google' AND user.user_metadata.avatar_url → Google photo
-//   2. otherwise → InitialsAvatar (colored circle with first letter of display_name)
+//   1. avatar_id is a PRESET id (Bulgarian historical figure) → /avatars/{id}.png
+//   2. avatar_id === 'google' AND user_metadata.avatar_url → Google photo
+//   3. otherwise → InitialsAvatar (colored circle with first letter of display_name)
 
 "use client";
 
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { GOOGLE_AVATAR_ID } from "@/lib/avatars";
+import { GOOGLE_AVATAR_ID, getPresetAvatar } from "@/lib/avatars";
 import { createBrowserSupabase } from "@/lib/supabase-browser";
 import { useSession } from "@/lib/use-session";
 import { InitialsAvatar } from "./_components/initials-avatar";
@@ -46,6 +47,7 @@ export function AuthNavLink() {
   if (user) {
     const googleUrl =
       (user.user_metadata as { avatar_url?: string } | undefined)?.avatar_url ?? null;
+    const preset = getPresetAvatar(avatarId);
     const useGoogle = avatarId === GOOGLE_AVATAR_ID && googleUrl;
     const fallbackName = displayName ?? user.email?.split("@")[0] ?? null;
 
@@ -55,7 +57,17 @@ export function AuthNavLink() {
         className="flex items-center gap-2 hover:underline underline-offset-4"
       >
         <span aria-hidden="true">
-          {useGoogle ? (
+          {preset ? (
+            <span className="relative inline-block h-6 w-6 overflow-hidden rounded-full ring-1 ring-stone-300 dark:ring-stone-700">
+              <Image
+                src={preset.file}
+                alt=""
+                fill
+                sizes="24px"
+                className="object-cover"
+              />
+            </span>
+          ) : useGoogle ? (
             <span className="relative inline-block h-6 w-6 overflow-hidden rounded-full ring-1 ring-stone-300 dark:ring-stone-700">
               <Image
                 src={googleUrl}
