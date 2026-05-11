@@ -203,6 +203,14 @@ Plans:
 - [ ] 06-02: Add `/intel/*` to the protected-routes set in middleware
 - [ ] 06-03: `/account` page with profile view + sign-out
 
+#### Backlog (post-initial-cut, captured 2026-05-11)
+
+- [ ] **Favorites / Saved items system** (FAV-01..FAV-06) — user can save any of: Laws (`/laws/[slug]`), Court decisions (`/courts/[court]/[id]`), EU regulations (`/eu/[celex]`), Audit findings (`/audit/finding/[id]`), DV acts (`/dv/[issue]`), Intel entities (`/intel/sanctions`, `/intel/offshore`).
+  - DB: `user_saved_items (id, user_id, item_type, item_id, item_slug, item_title, saved_at)` + RLS policies (users read/write own rows only).
+  - Bookmark icon (🔖) on every item card/page — filled when saved, outline when not. Toggle on click. Anonymous users see a "Sign in to save" prompt that links to `/sign-in?returnTo=…` (mirrors `<VoteButton>` anonymous variant from 06-01).
+  - `/profile/saved` page listing all saved items grouped by type, with type-filter chips (Закони / Решения / ЕС / Одит / ДВ / Разузнаване) and in-list search.
+  - **Scope concern:** This is substantial — DB schema, 6 page surfaces with bookmark UI, 1 new aggregate page with filters + search, anonymous-prompt UX. Likely justifies splitting Phase 6 into 6.1 (gating, current 3 plans) and 6.2 (favorites, ~4 new plans). Decide at `/gsd-discuss-phase 6` time.
+
 ### Phase 7: Premium tier hooks
 **Goal**: `user_profiles` has a `tier` enum, `useUserTier()` exists for client and server, and one minimal premium-gated capability is wired to prove the path. Stripe / billing explicitly out of scope.
 **Depends on**: Phase 6
