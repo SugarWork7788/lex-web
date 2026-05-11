@@ -27,14 +27,14 @@ describe("<AuthNavLink>", () => {
     expect(link).toHaveAttribute("href", "/sign-in");
   });
 
-  it("renders 'Профил' link to /account for signed-in user", () => {
+  it("renders 'Профил' link to /profile for signed-in user", () => {
     useSessionMock.mockReturnValue({
       user: { id: "u-1", email: "a@b.bg" },
       loading: false,
     });
     render(<AuthNavLink />);
     const link = screen.getByRole("link", { name: /^профил$/i });
-    expect(link).toHaveAttribute("href", "/account");
+    expect(link).toHaveAttribute("href", "/profile");
   });
 
   it("uses hover:underline underline-offset-4 (D-09 navbar pattern)", () => {
