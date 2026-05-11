@@ -165,13 +165,12 @@ Add user authentication to lex-web using Supabase Auth (already in stack). Email
   2. A new user can sign in with Google OAuth and a `user_profiles` row is created on first sign-in.
   3. Sign-out clears the session and the UI reflects anonymous state.
   4. `user_profiles` table has RLS enforcing "users can only read/update their own row".
-**Plans**: 4 plans
+**Plans**: 3 plans (collapsed from 4 per planner's call — 04-04 `getSession()` + `useSession()` merge into 04-02 because they share `lib/supabase-auth.ts` + the same vitest mocks; splitting added zero parallelism). Wave 1 = 04-01 (DB), Wave 2 = 04-02 (auth client), Wave 3 = 04-03 (UI). Strictly sequential — DB precondition for client; client precondition for UI. 2 BLOCKING checkpoints (04-01 live-DB push + 04-03 Google OAuth manual smoke) plus 1 BLOCKING human-action (pre-implementation operator checklist at top of 04-01).
 
 Plans:
-- [ ] 04-01: Configure Supabase Auth provider in `lib/supabase.ts` (server + client variants); add Google OAuth credentials to env
-- [ ] 04-02: Create `user_profiles` table (id pk = auth.users.id, display_name, locale, created_at) + RLS policies; ship as a migration block in `db/`-adjacent SQL
-- [ ] 04-03: Sign-in / sign-up / sign-out pages (Bulgarian) with Supabase Auth UI or hand-rolled form
-- [ ] 04-04: `getSession()` server util (Server Component & Route Handler), `useSession()` client hook
+- [ ] 04-01-PLAN.md — Wave 1: `db/auth_schema.sql` (user_profiles + RLS + hardened SECURITY DEFINER trigger with `SET search_path = public`) + `scripts/apply-auth-schema.ts` applier + `bun run db:auth-schema` script + pre-implementation operator checklist (Supabase + Google dashboard config) + BLOCKING live-DB push
+- [ ] 04-02-PLAN.md — Wave 2: `bun add @supabase/ssr@^0.10.3` + `lib/supabase-auth.ts` (3 factories + `getSession()` server util using `getUser()` per Pitfall 5) + `lib/use-session.ts` client hook + `app/auth/callback/route.ts` (with open-redirect guard `if (!next.startsWith("/")) next = "/"` per Pitfall 3) + `app/api/auth/sign-out/route.ts` (rate-limited via existing `lib/rate-limit.ts`) + 4 vitest files (~17 cases)
+- [ ] 04-03-PLAN.md — Wave 3: `/sign-in` + `/sign-up` + `/sign-up/check-email` Server Component pages + hand-rolled Bulgarian forms (D-01, D-10) reusing `alert-form.tsx` state-machine pattern + `<AuthNavLink>` client component appended to `app/layout.tsx` (D-09 right-aligned `hover:underline underline-offset-4`) + 3 vitest files (13 cases) + BLOCKING manual smoke (Google OAuth consent + email signup + open-redirect guard + sign-out + anonymous-vote regression check per Q5)
 
 ### Phase 5: Auth middleware + protected route system
 **Goal**: Next.js middleware enforces auth on routes that opt in; clean redirect-to-sign-in with returnTo preserves UX.
@@ -264,4 +263,4 @@ Ideas captured during planning but not in the v2.2 milestone. Promote into a num
 
 ---
 *Roadmap created: 2026-05-04 (auto mode, derived from session context)*
-*Last updated: 2026-05-11 — Phase 8.1 inserted (1 plan, 4 tasks, 2 BLOCKING checkpoints; addresses Phase 8 backfill failure)*
+*Last updated: 2026-05-11 — Phase 4 planned (3 plans, 9 tasks, 3 BLOCKING gates: operator checklist + live-DB push + OAuth/email smoke; opens v2.3 milestone)*
