@@ -41,8 +41,11 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION handle_new_user();
 
--- Avatar selection: preset Bulgarian historical figures.
--- Default 'asparuh' (Hahn Asparuh, founder of Bulgaria 681 AD).
--- Special value 'google' means "use raw_user_meta_data.avatar_url from
--- auth.users (Google profile photo)". UI reads lib/avatars.ts for the file map.
-ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS avatar_id text DEFAULT 'asparuh';
+-- Avatar selection.
+-- Default 'initials' = colored circle with first letter of display_name (UI generates).
+-- Value 'google' = use raw_user_meta_data.avatar_url from auth.users (Google profile photo).
+-- Preset PNG figures were removed; the column accepts any string for forward-compat
+-- but UI rejects unknown ids and falls back to initials.
+ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS avatar_id text DEFAULT 'initials';
+ALTER TABLE user_profiles ALTER COLUMN avatar_id SET DEFAULT 'initials';
+UPDATE user_profiles SET avatar_id = 'initials' WHERE avatar_id NOT IN ('initials', 'google');
