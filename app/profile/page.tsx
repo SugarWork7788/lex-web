@@ -1,6 +1,6 @@
-import { redirect } from "next/navigation";
 import { DEFAULT_AVATAR_ID } from "@/lib/avatars";
-import { createServerSupabase, getSession } from "@/lib/supabase-auth";
+import { requireAuth } from "@/lib/require-auth";
+import { createServerSupabase } from "@/lib/supabase-auth";
 import { AvatarPicker } from "./avatar-picker";
 import { ProfileSignOutButton } from "./sign-out-button";
 
@@ -13,10 +13,7 @@ const dateFormatter = new Intl.DateTimeFormat("bg-BG", {
 });
 
 export default async function ProfilePage() {
-  const user = await getSession();
-  if (!user) {
-    redirect("/sign-in?returnTo=/profile");
-  }
+  const user = await requireAuth("/profile");
 
   const supabase = await createServerSupabase();
   const { data: profile } = await supabase
