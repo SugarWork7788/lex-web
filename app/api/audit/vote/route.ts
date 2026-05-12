@@ -52,14 +52,14 @@ export async function POST(req: NextRequest) {
   }
 
   // D-03: per-user-per-finding uniqueness. user_id is the only identity that
-  // matters; legacy ip_hash / fingerprint_hash uniqueness is gone.
+  // matters; legacy hash-based uniqueness is gone.
   const existingCount = await countExistingVoteByUser(findingId, user.id);
   if (existingCount > 0) {
     return Response.json({ success: false, reason: "already_voted" });
   }
 
-  // INSERT: only finding_id + ip_hash + user_id. fingerprint_hash is
-  // deliberately omitted (column is nullable per the D-03 migration).
+  // INSERT: only finding_id + ip_hash + user_id. The forensic-only legacy
+  // column is deliberately omitted (now nullable per the D-03 migration).
   const ins = await insertVote({
     finding_id: findingId,
     ip_hash: ipHash,
