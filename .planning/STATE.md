@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.3
 milestone_name: Auth & Premium hooks
 status: in_progress
-last_updated: "2026-05-11T19:30:00Z"
-last_activity: 2026-05-11 -- Phase 4 (Auth foundation, first phase of v2.3) verified PASS-WITH-DEFERRED-UAT; ready for /gsd-ship.
+last_updated: "2026-05-12T10:30:00Z"
+last_activity: 2026-05-12 -- Phase 5 (Auth middleware) merged via PR #12 in autonomous-overnight mode; live on prod (dpl_oxw21ldk0). Next phase = Phase 6 (Page gating).
 progress:
   total_phases: 11
-  completed_phases: 5
-  total_plans: 13
-  completed_plans: 13
-  percent: 85
+  completed_phases: 6
+  total_plans: 14
+  completed_plans: 14
+  percent: 87
 ---
 
 # Project State
@@ -24,16 +24,22 @@ See: `.planning/PROJECT.md` (updated 2026-05-04)
 
 ## Current Position
 
-Phases 1, 2, 8 — **MERGED** to main:
-  - Phase 02 (PR #5): MERGED 2026-05-10T21:36:52Z (squash → e7d1cfc)
-  - Phase 08 (PR #6): merging now — conflict-resolution merge against new `main` (Phase 2 collision on STATE.md, package.json, bun.lock — resolved)
-  - lex-brain Phase 08 (PR #7): clean 2-commit branch awaiting review
+**Milestone v2.2** — Phases 1, 2, 8, 8.1 merged; Phase 3 (Mobile polish + CodeRabbit) still pending.
+**Milestone v2.3** — Phase 4 (Auth foundation) merged 2026-05-11 (PR #8 → d1d83d0); Phase 5 (Auth middleware) merged 2026-05-12 (PR #12 → 11f74705).
 
-**Active background process:** DV 2-year backfill (PID 84212) running in lex-brain since 2026-05-10T21:33:56Z. ~2–3 h ETA. Log: `/Users/beyond/Desktop/lex-brain/logs/scrapers/dv.log`. Resumable; idempotent inserts.
+**Most recent shipping activity (overnight 2026-05-11 → 2026-05-12):**
+  - PR #10 (5a692a0): restore Bulgarian historical-figure preset avatars
+  - PR #11 (b290c8a): avatar picker image-only (drop text labels)
+  - PR #12 (11f74705): Phase 5 — auth proxy + requireAuth() helper
 
-Next phase in milestone v2.2: Phase 03 (Mobile polish + CodeRabbit GitHub App).
+**Active background processes (lex-brain):**
+  - DV 2020–2023 backfill (PID 8362) — running since 2026-05-11T11:58 local
+  - DV 2016–2019 backfill (PID 55601) — running since 2026-05-12T10:14 local
+  - EUR-Lex v2 scraper (PID 62352) — restarted 2026-05-12 with jittered 60–180s empty-page retry (up to 10 attempts/page) replacing the old "exit after 3 empty pages" bug
 
-Progress: ████████░░ 75%
+Next phase in milestone v2.3: **Phase 6 — Page gating** (gate `/audit` voting + record `user_id` on votes; `/account` page).
+
+Progress: █████████░ 87% (6/8 v2.2+v2.3 phases done; Phase 3 mobile-polish + Phase 6+7 pending)
 
 ## Performance Metrics
 

@@ -150,7 +150,7 @@ Add user authentication to lex-web using Supabase Auth (already in stack). Email
 ## Phases
 
 - [x] **Phase 4: Auth foundation** — Supabase Auth + email/password + Google OAuth + user_profiles + sign-in UI + /profile page + 30 Bulgarian historical avatars (3/3 plans complete; verifier PASS-WITH-DEFERRED-UAT for Smokes 2+4)
-- [ ] **Phase 5: Auth middleware** — Next.js middleware, protected-route helper, server-side session util
+- [x] **Phase 5: Auth middleware** — Next 16 `proxy.ts` (renamed from middleware) + `lib/require-auth.ts` helper. Gates `/intel/*` and `/profile/*` with cookie-presence optimistic redirect + page-level real validation. 1/3 plans (executed in autonomous-overnight mode — 05-02 ProtectedRoute boundary and 05-03 PROJECT.md decision-log update skipped; see 05-01-SUMMARY.md "Scope decisions"). PR #12 → 11f74705.
 - [ ] **Phase 6: Page gating** — gate /audit voting + /intel; anonymous still sees /audit content
 - [ ] **Phase 7: Premium hooks** — tier column + useUserTier hook + one example premium-gated feature (no Stripe)
 
@@ -180,12 +180,12 @@ Plans:
   1. A request to a protected route without a valid Supabase session is redirected to `/sign-in?returnTo=<original-path>`.
   2. After successful sign-in, the user lands on the original returnTo path.
   3. Server Components in protected routes can call `getSession()` and assume non-null.
-**Plans**: 3 plans
+**Plans**: 3 plans (1 complete; 2 deferred per autonomous-mode scope decision — see 05-01-SUMMARY.md)
 
 Plans:
-- [ ] 05-01: `middleware.ts` (or Next 16 equivalent) reads Supabase session, allowlists `/sign-in`, `/sign-up`, public reader routes
-- [ ] 05-02: `requireAuth()` helper for Route Handlers; `<ProtectedRoute>` boundary component for client trees that need auth
-- [ ] 05-03: Document protected-route convention in PROJECT.md "Key Decisions" — which routes are public-by-default, which require opt-in
+- [x] 05-01: Next 16 `proxy.ts` (middleware renamed) + `lib/require-auth.ts` helper; matcher = `/intel/:path*` + `/profile/:path*`; opt-in by adding to matcher. (✓ 2026-05-12; 127/127 tests; PR #12 → 11f74705 → prod `dpl_oxw21ldk0`)
+- [ ] 05-02: `<ProtectedRoute>` boundary component — deferred: current architecture has no client-tree-only protected sub-areas. Promote when one appears.
+- [ ] 05-03: Document protected-route convention in PROJECT.md "Key Decisions" — deferred: convention is inline-documented in `proxy.ts` + `lib/require-auth.ts`; promote when referenced from a third file.
 
 ### Phase 6: Page gating
 **Goal**: `/audit` voting and the entire `/intel` section require auth. Anonymous users still see `/audit` finding content (just can't vote) and the rest of the public reader.
