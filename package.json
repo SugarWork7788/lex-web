@@ -9,6 +9,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
+    "db:audit-votes-migration": "tsx scripts/apply-audit-votes-migration.ts",
     "db:auth-schema": "tsx scripts/apply-auth-schema.ts",
     "db:dv-schema": "tsx scripts/apply-dv-schema.ts",
     "db:intel-fts": "tsx scripts/apply-intel-fts.ts"
