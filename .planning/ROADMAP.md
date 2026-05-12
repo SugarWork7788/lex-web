@@ -151,7 +151,8 @@ Add user authentication to lex-web using Supabase Auth (already in stack). Email
 
 - [x] **Phase 4: Auth foundation** — Supabase Auth + email/password + Google OAuth + user_profiles + sign-in UI + /profile page + 30 Bulgarian historical avatars (3/3 plans complete; verifier PASS-WITH-DEFERRED-UAT for Smokes 2+4)
 - [x] **Phase 5: Auth middleware** — Next 16 `proxy.ts` (renamed from middleware) + `lib/require-auth.ts` helper. Gates `/intel/*` and `/profile/*` with cookie-presence optimistic redirect + page-level real validation. 1/3 plans (executed in autonomous-overnight mode — 05-02 ProtectedRoute boundary and 05-03 PROJECT.md decision-log update skipped; see 05-01-SUMMARY.md "Scope decisions"). PR #12 → 11f74705.
-- [ ] **Phase 6: Page gating** — gate /audit voting + /intel; anonymous still sees /audit content
+- [ ] **Phase 6.1: Voting gate** — gate `/audit` voting (anonymous reads stay open); record `user_id` on votes. (Phase 6 split 2026-05-12; old 06-02 "gate /intel/*" is already satisfied by Phase 5's proxy matcher; old 06-03 "/account page" is satisfied by Phase 4's `/profile` page — see Phase 6.1 details.)
+- [ ] **Phase 6.2: Favorites / Saved items** — bookmark icon on every readable surface; `/profile/saved` aggregate page; anon "Sign in to save" prompts. Promoted from backlog 2026-05-12.
 - [ ] **Phase 7: Premium hooks** — tier column + useUserTier hook + one example premium-gated feature (no Stripe)
 
 ## Phase Details
@@ -187,28 +188,34 @@ Plans:
 - [ ] 05-02: `<ProtectedRoute>` boundary component — deferred: current architecture has no client-tree-only protected sub-areas. Promote when one appears.
 - [ ] 05-03: Document protected-route convention in PROJECT.md "Key Decisions" — deferred: convention is inline-documented in `proxy.ts` + `lib/require-auth.ts`; promote when referenced from a third file.
 
-### Phase 6: Page gating
-**Goal**: `/audit` voting and the entire `/intel` section require auth. Anonymous users still see `/audit` finding content (just can't vote) and the rest of the public reader.
+### Phase 6.1: Voting gate
+**Goal**: Anonymous users can read `/audit` findings but cannot vote; signed-in users can vote and each vote is attributed to `auth.users.id` in `audit_votes` (in addition to the existing IP+fingerprint anti-abuse columns).
 **Depends on**: Phase 5
-**Requirements**: AUTH-08, AUTH-09, AUTH-10, AUTH-11
+**Requirements**: AUTH-08, AUTH-10
+**Naming note (D-09 / Phase 4)**: This project keeps the user account page at `/profile`, not `/account`. The original Phase 6 success criterion #4 (the `/account` page) is satisfied by Phase 4's `/profile` page (display_name + email + created_at + sign-out + avatar picker). AUTH-11 is therefore already closed; ROADMAP language updated 2026-05-12 to match.
+**Already satisfied by earlier phases (don't re-implement)**:
+  - **AUTH-09** (anonymous `/intel/*` → `/sign-in?returnTo=…`) — Phase 5 proxy matcher (`/intel/:path*`) already redirects.
+  - **AUTH-11** (`/account` page) — Phase 4 `/profile` page covers this; no rename per D-09.
 **Success Criteria** (what must be TRUE):
-  1. Anonymous user on `/audit/finding/[id]` sees the full finding but the vote button shows "Sign in to vote" (links to `/sign-in?returnTo=...`).
-  2. Anonymous request to any `/intel/*` route is redirected to sign-in.
-  3. Authenticated user can vote and the vote is attributed to their `user_id` in `audit_votes` (in addition to existing IP/fingerprint).
-  4. There is an `/account` page showing display name, email, and a sign-out button.
-**Plans**: 3 plans
+  1. Anonymous user on `/audit/finding/[id]` sees the full finding but the vote button shows "Sign in to vote" (links to `/sign-in?returnTo=…`). [AUTH-08]
+  2. Authenticated user can vote and the vote is attributed to their `user_id` in `audit_votes` alongside the existing IP+fingerprint columns. [AUTH-10]
+  3. `audit_votes` schema has a nullable `user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL` column (nullable to preserve any historical anonymous-vote rows).
+**Plans**: TBD at /gsd-discuss-phase 6.1 — most likely 1-2 plans (the substantive work is concentrated in 06.1-01).
 
 Plans:
-- [ ] 06-01: Gate the `<VoteButton>` component — anonymous variant + authed variant; update `/api/audit/vote` to require session and record `user_id`
-- [ ] 06-02: Add `/intel/*` to the protected-routes set in middleware
-- [ ] 06-03: `/account` page with profile view + sign-out
+- [ ] 06.1-01: `<VoteButton>` anonymous variant ("Sign in to vote" → `/sign-in?returnTo=…`) + authed variant. `/api/audit/vote` requires session via `createRouteHandlerSupabase` + `getUser()`; records `user_id`. Supabase migration to add `audit_votes.user_id`. Existing IP+fingerprint anti-abuse logic preserved.
 
-#### Backlog (post-initial-cut, captured 2026-05-11)
-
-- [ ] **Favorites / Saved items system** (FAV-01..FAV-06) — user can save any of: Laws (`/laws/[slug]`), Court decisions (`/courts/[court]/[id]`), EU regulations (`/eu/[celex]`), Audit findings (`/audit/finding/[id]`), DV acts (`/dv/[issue]`), Intel entities (`/intel/sanctions`, `/intel/offshore`).
+### Phase 6.2: Favorites / Saved items
+**Goal**: Signed-in users can bookmark any readable surface (Laws, Court decisions, EU regulations, Audit findings, DV acts, Intel entities) and browse all saved items from `/profile/saved`.
+**Depends on**: Phase 5 (proxy), Phase 6.1 (anonymous-prompt pattern reused for "Sign in to save")
+**Requirements**: FAV-01..FAV-06 (to be defined at /gsd-discuss-phase 6.2 time)
+**Status**: Promoted from backlog 2026-05-12 per user decision to split old Phase 6.
+**Sketch** (to be refined when phase starts):
   - DB: `user_saved_items (id, user_id, item_type, item_id, item_slug, item_title, saved_at)` + RLS policies (users read/write own rows only).
-  - Bookmark icon (🔖) on every item card/page — filled when saved, outline when not. Toggle on click. Anonymous users see a "Sign in to save" prompt that links to `/sign-in?returnTo=…` (mirrors `<VoteButton>` anonymous variant from 06-01).
+  - Bookmark icon (🔖) on every item card/page — filled when saved, outline when not. Toggle on click. Anonymous users see a "Sign in to save" prompt that links to `/sign-in?returnTo=…` (mirrors `<VoteButton>` anonymous variant from 06.1-01).
   - `/profile/saved` page listing all saved items grouped by type, with type-filter chips (Закони / Решения / ЕС / Одит / ДВ / Разузнаване) and in-list search.
+  - Scope: DB schema + 6 page surfaces wired with bookmark UI + 1 aggregate page with filters + anonymous-prompt UX. Estimate ~4 plans at /gsd-plan-phase time.
+**Plans**: TBD at /gsd-discuss-phase 6.2.
   - **Scope concern:** This is substantial — DB schema, 6 page surfaces with bookmark UI, 1 new aggregate page with filters + search, anonymous-prompt UX. Likely justifies splitting Phase 6 into 6.1 (gating, current 3 plans) and 6.2 (favorites, ~4 new plans). Decide at `/gsd-discuss-phase 6` time.
 
 ### Phase 7: Premium tier hooks
@@ -239,10 +246,11 @@ All 14 v2.3 requirements mapped to a phase. ✓
 | AUTH-05 | 5 |
 | AUTH-06 | 5 |
 | AUTH-07 | 5 |
-| AUTH-08 | 6 |
-| AUTH-09 | 6 |
-| AUTH-10 | 6 |
-| AUTH-11 | 6 |
+| AUTH-08 | 6.1 |
+| AUTH-09 | ~~6~~ → already satisfied by Phase 5 (proxy matcher) |
+| AUTH-10 | 6.1 |
+| AUTH-11 | ~~6~~ → already satisfied by Phase 4 (/profile page; D-09 no-rename) |
+| FAV-01..06 | 6.2 |
 | AUTH-12 | 7 |
 | AUTH-13 | 7 |
 | AUTH-14 | 7 |
