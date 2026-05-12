@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.3
 milestone_name: Auth & Premium hooks
 status: in_progress
-last_updated: "2026-05-12T10:30:00Z"
-last_activity: 2026-05-12 -- Phase 5 (Auth middleware) merged via PR #12 in autonomous-overnight mode; live on prod (dpl_oxw21ldk0). Next phase = Phase 6 (Page gating).
+last_updated: "2026-05-12T11:35:00Z"
+last_activity: 2026-05-12 -- Phase 6.1 (Voting gate) shipped via PR #13 → 743808f → prod dpl_5j9427ct1. Live-DB migration applied with 2 historical anonymous rows preserved. /audit reading stays public; vote button now server-decided anon/authed; /api/audit/vote returns 401 for anon. Next phase = Phase 6.2 (Favorites/Saved items) or Phase 3 (Mobile polish + CodeRabbit, still pending in v2.2).
 progress:
-  total_phases: 11
-  completed_phases: 6
-  total_plans: 14
-  completed_plans: 14
-  percent: 87
+  total_phases: 12
+  completed_phases: 7
+  total_plans: 15
+  completed_plans: 15
+  percent: 90
 ---
 
 # Project State

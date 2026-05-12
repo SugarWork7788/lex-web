@@ -151,7 +151,7 @@ Add user authentication to lex-web using Supabase Auth (already in stack). Email
 
 - [x] **Phase 4: Auth foundation** — Supabase Auth + email/password + Google OAuth + user_profiles + sign-in UI + /profile page + 30 Bulgarian historical avatars (3/3 plans complete; verifier PASS-WITH-DEFERRED-UAT for Smokes 2+4)
 - [x] **Phase 5: Auth middleware** — Next 16 `proxy.ts` (renamed from middleware) + `lib/require-auth.ts` helper. Gates `/intel/*` and `/profile/*` with cookie-presence optimistic redirect + page-level real validation. 1/3 plans (executed in autonomous-overnight mode — 05-02 ProtectedRoute boundary and 05-03 PROJECT.md decision-log update skipped; see 05-01-SUMMARY.md "Scope decisions"). PR #12 → 11f74705.
-- [ ] **Phase 6.1: Voting gate** — gate `/audit` voting (anonymous reads stay open); record `user_id` on votes. (Phase 6 split 2026-05-12; old 06-02 "gate /intel/*" is already satisfied by Phase 5's proxy matcher; old 06-03 "/account page" is satisfied by Phase 4's `/profile` page — see Phase 6.1 details.)
+- [x] **Phase 6.1: Voting gate** — `/audit` voting now requires auth; anonymous still reads findings. Live-DB migration applied + 14 new tests + PR #13 → `743808f` → prod `dpl_5j9427ct1`. (Phase 6 split 2026-05-12; old 06-02 satisfied by Phase 5's proxy; old 06-03 satisfied by Phase 4's `/profile`.)
 - [ ] **Phase 6.2: Favorites / Saved items** — bookmark icon on every readable surface; `/profile/saved` aggregate page; anon "Sign in to save" prompts. Promoted from backlog 2026-05-12.
 - [ ] **Phase 7: Premium hooks** — tier column + useUserTier hook + one example premium-gated feature (no Stripe)
 
@@ -200,10 +200,10 @@ Plans:
   1. Anonymous user on `/audit/finding/[id]` sees the full finding but the vote button shows "Sign in to vote" (links to `/sign-in?returnTo=…`). [AUTH-08]
   2. Authenticated user can vote and the vote is attributed to their `user_id` in `audit_votes` alongside the existing IP+fingerprint columns. [AUTH-10]
   3. `audit_votes` schema has a nullable `user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL` column (nullable to preserve any historical anonymous-vote rows).
-**Plans**: TBD at /gsd-discuss-phase 6.1 — most likely 1-2 plans (the substantive work is concentrated in 06.1-01).
+**Plans**: 1 plan (1 complete)
 
 Plans:
-- [ ] 06.1-01: `<VoteButton>` anonymous variant ("Sign in to vote" → `/sign-in?returnTo=…`) + authed variant. `/api/audit/vote` requires session via `createRouteHandlerSupabase` + `getUser()`; records `user_id`. Supabase migration to add `audit_votes.user_id`. Existing IP+fingerprint anti-abuse logic preserved.
+- [x] 06.1-01: `<VoteButton>` server/client split + 401 route preamble + `lib/audit-votes-queries.ts` seam + DB migration (user_id column, drop legacy UNIQUEs, partial UNIQUE on user_id). 14 vitest cases. 1 BLOCKING checkpoint (live-DB push + 2-row preservation check). (✓ 2026-05-12; 141/141 tests; PR #13 → 743808f → prod `dpl_5j9427ct1`)
 
 ### Phase 6.2: Favorites / Saved items
 **Goal**: Signed-in users can bookmark any readable surface (Laws, Court decisions, EU regulations, Audit findings, DV acts, Intel entities) and browse all saved items from `/profile/saved`.
