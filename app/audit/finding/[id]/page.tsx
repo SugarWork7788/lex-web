@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getAuditFindingById } from "@/lib/queries";
-import { VoteButton } from "../../vote-button";
+import { VoteButtonServer } from "../../vote-button-server";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -83,7 +83,11 @@ export default async function AuditFindingPage({ params }: Props) {
         </article>
 
         <div className="mt-8 flex flex-wrap items-center gap-3 print:hidden">
-          <VoteButton findingId={f.id} initialCount={f.vote_count} />
+          <VoteButtonServer
+            findingId={f.id}
+            initialCount={f.vote_count}
+            currentPath={`/audit/finding/${id}`}
+          />
           <span className="text-xs text-stone-500">Cmd/Ctrl + P за PDF</span>
         </div>
 

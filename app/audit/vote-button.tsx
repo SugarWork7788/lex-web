@@ -1,34 +1,30 @@
 "use client";
 import { useState } from "react";
+import type { User } from "@supabase/supabase-js";
 
-async function fingerprint(): Promise<string> {
-  const ua = navigator.userAgent;
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const screen = `${window.screen.width}x${window.screen.height}`;
-  const lang = navigator.language;
-  const raw = `${ua}|${screen}|${tz}|${lang}`;
-  const buf = new TextEncoder().encode(raw);
-  const hash = await crypto.subtle.digest("SHA-256", buf);
-  return Array.from(new Uint8Array(hash))
-    .map((b) => b.toString(16).padStart(2, "0")).join("");
-}
+type Props = {
+  findingId: string;
+  initialCount: number;
+  user: Pick<User, "id"> | null;
+  currentPath: string;
+};
 
-export function VoteButton({
-  findingId, initialCount,
-}: { findingId: string; initialCount: number }) {
+export function VoteButton({ findingId, initialCount, user, currentPath }: Props) {
   const [count, setCount] = useState(initialCount);
   const [state, setState] = useState<"idle" | "busy" | "voted" | "error">("idle");
   const [reason, setReason] = useState<string | null>(null);
 
+  const isAnon = user === null;
+  const signInHref = `/sign-in?returnTo=${encodeURIComponent(currentPath)}`;
+
   const vote = async () => {
-    if (state !== "idle") return;
+    if (isAnon || state !== "idle") return;
     setState("busy");
     try {
-      const fp = await fingerprint();
       const r = await fetch("/api/audit/vote", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ finding_id: findingId, fingerprint: fp }),
+        body: JSON.stringify({ finding_id: findingId }),
       });
       const data = await r.json();
       if (data.success) {
@@ -43,23 +39,38 @@ export function VoteButton({
     }
   };
 
+  const buttonClass = `rounded-md border px-3 py-1 font-medium transition ${
+    isAnon
+      ? "border-stone-700 bg-stone-900/60 text-stone-500 cursor-not-allowed"
+      : state === "voted"
+        ? "border-emerald-700 bg-emerald-900/30 text-emerald-200 cursor-default"
+        : state === "error"
+          ? "border-red-700 bg-red-900/30 text-red-200"
+          : "border-stone-600 bg-stone-800 text-stone-100 hover:border-red-500 hover:bg-red-900/30"
+  }`;
+
   return (
     <div className="flex items-center gap-2 text-xs">
       <button
         onClick={vote}
-        disabled={state !== "idle"}
-        className={`rounded-md border px-3 py-1 font-medium transition ${
-          state === "voted"
-            ? "border-emerald-700 bg-emerald-900/30 text-emerald-200 cursor-default"
-            : state === "error"
-              ? "border-red-700 bg-red-900/30 text-red-200"
-              : "border-stone-600 bg-stone-800 text-stone-100 hover:border-red-500 hover:bg-red-900/30"
-        }`}
+        disabled={isAnon || state !== "idle"}
+        title={isAnon ? "Влезте, за да гласувате" : undefined}
+        className={buttonClass}
       >
         {state === "voted" ? "✓ Гласувахте" : state === "busy" ? "…" : "👍 Подкрепи"}
       </button>
-      <span className="tabular-nums text-stone-300">{count} {count === 1 ? "глас" : "гласа"}</span>
-      {state === "error" && reason === "rate_limited" && (
+      <span className="tabular-nums text-stone-300">
+        {count} {count === 1 ? "глас" : "гласа"}
+      </span>
+      {isAnon && (
+        <a
+          href={signInHref}
+          className="text-emerald-400 hover:underline underline-offset-4"
+        >
+          · Влез за глас →
+        </a>
+      )}
+      {!isAnon && state === "error" && reason === "rate_limited" && (
         <span className="text-amber-400">лимит 24ч</span>
       )}
     </div>

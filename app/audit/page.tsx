@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getAuditFindings, getAuditStats, type AuditFinding } from "@/lib/queries";
-import { VoteButton } from "./vote-button";
+import { VoteButtonServer } from "./vote-button-server";
 import { DownloadPdfButton } from "./download-pdf-button";
 
 export const revalidate = 60;
@@ -251,7 +251,13 @@ function FindingCard({ f }: { f: AuditFinding }) {
           <Link href={`/audit/finding/${f.id}`} className="text-stone-400 hover:text-stone-100 hover:underline">
             🔗 Сподели
           </Link>
-          <div className="ml-auto"><VoteButton findingId={f.id} initialCount={f.vote_count} /></div>
+          <div className="ml-auto">
+            <VoteButtonServer
+              findingId={f.id}
+              initialCount={f.vote_count}
+              currentPath={`/audit/finding/${f.id}`}
+            />
+          </div>
         </div>
       </summary>
       <div className="mt-4 space-y-3 border-t border-stone-800 pt-3 text-sm">
