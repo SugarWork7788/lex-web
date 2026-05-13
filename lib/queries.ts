@@ -581,16 +581,24 @@ export type KzkDecision = {
   source_url: string | null;
 };
 
+export type BnbDecision = {
+  id: string;
+  title: string;
+  date: string | null;
+  doc_type: string | null;
+  source_url: string | null;
+};
+
 export async function getIntelCounts(): Promise<{
   sanctioned: number; offshore: number; olaf: number;
-  articles: number; prosecution: number; nap: number; kzk: number;
+  articles: number; prosecution: number; nap: number; kzk: number; bnb: number;
 }> {
   const tables: ("sanctioned_entities" | "offshore_entities" | "olaf_cases" |
                  "investigative_articles" | "prosecution_cases" |
-                 "nap_rulings" | "kzk_decisions")[]
+                 "nap_rulings" | "kzk_decisions" | "bnb_decisions")[]
     = ["sanctioned_entities", "offshore_entities", "olaf_cases",
        "investigative_articles", "prosecution_cases", "nap_rulings",
-       "kzk_decisions"];
+       "kzk_decisions", "bnb_decisions"];
   const counts = await Promise.all(tables.map(async (t) => {
     const r = await supabase.from(t).select("id", { count: "exact", head: true });
     return [t, r.count ?? 0] as const;
@@ -604,6 +612,7 @@ export async function getIntelCounts(): Promise<{
     prosecution: m.prosecution_cases ?? 0,
     nap:        m.nap_rulings ?? 0,
     kzk:        m.kzk_decisions ?? 0,
+    bnb:        m.bnb_decisions ?? 0,
   };
 }
 
@@ -949,4 +958,22 @@ export async function listKzkDecisions(opts: {
   q = q.range(page * pageSize, page * pageSize + pageSize - 1);
   const { data, count } = await q;
   return { items: (data ?? []) as KzkDecision[], total: count ?? 0 };
+}
+
+export async function listBnbDecisions(opts: {
+  search?: string; doc_type?: string; page?: number; pageSize?: number;
+}): Promise<{ items: BnbDecision[]; total: number }> {
+  const { search, doc_type, page = 0, pageSize = 50 } = opts;
+  let q = supabase.from("bnb_decisions")
+    .select("id,title,date,doc_type,source_url",
+            { count: "exact" })
+    .order("date", { ascending: false, nullsFirst: false });
+  if (doc_type) q = q.eq("doc_type", doc_type);
+  if (search) {
+    const safe = search.replace(/[%]/g, " ");
+    q = q.ilike("title", `%${safe}%`);
+  }
+  q = q.range(page * pageSize, page * pageSize + pageSize - 1);
+  const { data, count } = await q;
+  return { items: (data ?? []) as BnbDecision[], total: count ?? 0 };
 }
