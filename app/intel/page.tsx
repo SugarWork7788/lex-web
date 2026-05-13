@@ -20,6 +20,7 @@ export default async function IntelPage() {
     { n: c.offshore,   label: "Офшорни структури",                href: "/intel/offshore" },
     { n: c.olaf,       label: "OLAF разследвания",                href: "/intel/olaf" },
     { n: c.kzk,        label: "КЗК решения",                      href: "/intel/kzk" },
+    { n: c.bnb,        label: "БНБ актове",                       href: "/intel/bnb" },
     { n: c.articles,   label: "Разследващи статии",               href: "/intel/articles" },
     { n: c.prosecution,label: "Прокурорски случаи",               href: "/intel/prosecution" },
     { n: c.nap,        label: "НАП указания",                     href: "/issues" },
