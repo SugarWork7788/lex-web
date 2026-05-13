@@ -572,14 +572,25 @@ export type ProsecutionCase = {
   source_url: string | null;
 };
 
+export type KzkDecision = {
+  id: string;
+  title: string;
+  date: string | null;
+  case_number: string | null;
+  decision_type: string | null;
+  source_url: string | null;
+};
+
 export async function getIntelCounts(): Promise<{
   sanctioned: number; offshore: number; olaf: number;
-  articles: number; prosecution: number; nap: number;
+  articles: number; prosecution: number; nap: number; kzk: number;
 }> {
   const tables: ("sanctioned_entities" | "offshore_entities" | "olaf_cases" |
-                 "investigative_articles" | "prosecution_cases" | "nap_rulings")[]
+                 "investigative_articles" | "prosecution_cases" |
+                 "nap_rulings" | "kzk_decisions")[]
     = ["sanctioned_entities", "offshore_entities", "olaf_cases",
-       "investigative_articles", "prosecution_cases", "nap_rulings"];
+       "investigative_articles", "prosecution_cases", "nap_rulings",
+       "kzk_decisions"];
   const counts = await Promise.all(tables.map(async (t) => {
     const r = await supabase.from(t).select("id", { count: "exact", head: true });
     return [t, r.count ?? 0] as const;
@@ -592,6 +603,7 @@ export async function getIntelCounts(): Promise<{
     articles:   m.investigative_articles ?? 0,
     prosecution: m.prosecution_cases ?? 0,
     nap:        m.nap_rulings ?? 0,
+    kzk:        m.kzk_decisions ?? 0,
   };
 }
 
@@ -918,4 +930,23 @@ export async function listDvActs(opts: {
     return [];
   }
   return (data ?? []) as DvActRow[];
+}
+
+export async function listKzkDecisions(opts: {
+  search?: string; decision_type?: string; page?: number; pageSize?: number;
+}): Promise<{ items: KzkDecision[]; total: number }> {
+  const { search, decision_type, page = 0, pageSize = 50 } = opts;
+  let q = supabase.from("kzk_decisions")
+    .select("id,title,date,case_number,decision_type,source_url",
+            { count: "exact" })
+    .order("date", { ascending: false, nullsFirst: false });
+  if (decision_type) q = q.eq("decision_type", decision_type);
+  if (search) {
+    const safe = search.replace(/[%]/g, " ");
+    // Match against either title or case_number — case-insensitive ilike.
+    q = q.or(`title.ilike.%${safe}%,case_number.ilike.%${safe}%`);
+  }
+  q = q.range(page * pageSize, page * pageSize + pageSize - 1);
+  const { data, count } = await q;
+  return { items: (data ?? []) as KzkDecision[], total: count ?? 0 };
 }
