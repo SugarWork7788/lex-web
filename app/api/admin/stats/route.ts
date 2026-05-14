@@ -15,9 +15,18 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
+import { createClient } from "@supabase/supabase-js";
 import { createRouteHandlerSupabase } from "@/lib/supabase-auth";
 import { supabase } from "@/lib/supabase";
 import { isAdminEmail } from "@/lib/require-admin";
+
+// Service-role client for tables protected by RLS (e.g. user_profiles).
+// Used only inside admin-gated handlers — auth is verified upstream.
+function getServiceClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  return createClient(url, key);
+}
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -154,10 +163,14 @@ const DB_TABLES = [
 ] as const;
 
 async function databasePanel(): Promise<Record<string, number | null>> {
+  // user_profiles is RLS-protected — anon returns 0. The whole admin route
+  // is already gated, so route the count through the service role.
+  const admin = getServiceClient();
   const entries = await Promise.all(
     DB_TABLES.map(async (t) => {
       try {
-        const { count, error } = await supabase
+        const client = t === "user_profiles" ? admin : supabase;
+        const { count, error } = await client
           .from(t)
           .select("id", { count: "exact", head: true });
         if (error) return [t, null] as const;
@@ -265,8 +278,10 @@ async function recentMergedPRs() {
 }
 
 async function totalUsers(): Promise<number | null> {
+  // user_profiles is RLS-protected; the anon key returns 0. Use service role
+  // (admin route — gate already enforced upstream).
   try {
-    const { count } = await supabase
+    const { count } = await getServiceClient()
       .from("user_profiles")
       .select("id", { count: "exact", head: true });
     return count ?? 0;
